@@ -61,5 +61,38 @@ BUILD_EXEC         := yes
 GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
-###############################################################################
-# Additional special case targets should be added here
+# ======================================================================================
+# PETSc
+# ======================================================================================
+PETSC_DIR           ?= $(MOOSE_DIR)/petsc
+PETSC_ARCH          ?= arch-moose
+LIBMESH_DIR         ?= $(MOOSE_DIR)/libmesh/installed/
+# Use compiler info discovered by PETSC
+ifeq ($(PETSC_ARCH),)
+	include $(PETSC_DIR)/$(PETSC_ARCH)/lib/petsc/conf/petscvariables
+else
+	include $(PETSC_DIR)/lib/petsc/conf/petscvariables
+endif
+
+# libmesh_CXX, etc, were defined in build.mk
+export CXX := $(libmesh_CXX)
+export CC  := $(libmesh_CC)
+export FC  := $(libmesh_F90)
+export FFLAGS := $(libmesh_FFLAGS)
+export CFLAGS := $(libmesh_CFLAGS)
+export CXXFLAGS := $(libmesh_CXXFLAGS)
+export CPPFLAGS := $(libmesh_CPPFLAGS)
+export LDFLAGS := $(libmesh_LDFLAGS)
+export LIBS := $(libmesh_LIBS)
+
+FISPACT_DIR ?= ${MOOSE_DIR}/../FISPACT/ubuntu/20.10
+FISPACT_INCLUDES ?= -I ${FISPACT_DIR}/include/c -I ${FISPACT_DIR}/include/cpp
+FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/
+# FISPACT_LIB ?= 
+
+ADDITIONAL_LIBS := -L$(FISPACT_LIB_DIR) -lfispactapi -lfmt
+ADDITIONAL_LIBS += $(CC_LINKER_SLFLAG)$(FISPACT_LIB_DIR)
+# libmesh_CXX, etc, were defined in build.mk
+
+ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES)
+
