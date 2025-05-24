@@ -39,9 +39,18 @@ FispactProblem::FispactProblem(const InputParameters& params) :
     _fp_monitor(fispactLogName()),
     _fp_nuclear_data(_fp_monitor)
 {
+    // Get the path to our nuclear data
+    std::string fp_nuclear_data_path = getParam<std::string>("fispact_nuclear_data_path");
 
+
+    setNuclearData(fp_nuclear_data_path);
 }
 
+
+void FispactProblem::externalSolve()
+{
+
+}
 
 std::vector<double> FispactProblem::readNeutronFluxFromH5(const std::string& filename)
 {
@@ -54,4 +63,26 @@ std::string FispactProblem::fispactLogName()
 {
     std::string log_name = "FISPACT_app_" + std::to_string(processor_id()) + ".log";
     return log_name;
+}
+
+void FispactProblem::setNuclearData(std::string nd_base_path)
+{
+    fp::io::NuclearDataReader nd_reader(_fp_monitor);
+
+    nd_reader.setPath(FISPACT_ND_IND_NUC_KEY, nd_base_path + "decay2020/decay_2020_index.txt");
+    
+    nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, nd_base_path + "TENDL2021data/gendf-1102");
+    nd_reader.setPath(FISPACT_ND_PROB_TAB_KEY, nd_base_path + "TENDL2021data/tp-1102-294");
+
+    nd_reader.setPath(FISPACT_ND_FY_ENDF_KEY, nd_base_path + "GEFY61data/gefy61_nfy");
+    nd_reader.setPath(FISPACT_ND_SF_ENDF_KEY, nd_base_path + "GEFY61data/gefy61_sfy");
+
+    nd_reader.setPath(FISPACT_ND_DK_ENDF_KEY, nd_base_path + "decay2020/decay_2020");
+    nd_reader.setPath(FISPACT_ND_ABSORP_KEY, nd_base_path + "decay/abs_2012");
+
+    nd_reader.setPath(FISPACT_ND_HAZARDS_KEY, nd_base_path + "/decay/hazards_2012");
+    nd_reader.setPath(FISPACT_ND_CLEAR_KEY, nd_base_path + "/decay/clear_2012");
+    nd_reader.setPath(FISPACT_ND_A2DATA_KEY, nd_base_path + "/decay/a2_2012");
+    
+    nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
 }
