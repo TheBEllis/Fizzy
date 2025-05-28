@@ -45,11 +45,17 @@ class FispactProblem : public ExternalProblem
         /// Write output photon flux to HDF5
         void writePhotonFluxToHDF5(const std::string& filename);
 
+        void setFispactInputData(fp::Monitor& monitor, fp::InputData& ip, fp::OutputData& ip, std::vector<double> neutron_flux);        
+
         /// Generate a log file name for the fispact logs
         std::string fispactLogName();
         
         // Initialise FISPACT monitor object
         void initFispactMonitor(std::string);
+
+        void readNeutronFluxFromHDF5(std::string filename);
+
+        void read_material_xml_data();
     
         /// FISPACT monitor
         fp::FispactMonitor _fp_monitor;       
@@ -57,6 +63,30 @@ class FispactProblem : public ExternalProblem
         /// FISPACT nuclear data
         fp::NuclearData _fp_nuclear_data;      
 
+        /// FISPACT neutron flux
+        std::vector<std::vector<double>> _neutron_flux;
 
+        /// hdf5 filename for neutron flux
+        std::string _neutron_flux_filename;
+        
+        /// path to neutron flux array in hdf5 file
+        std::string _neutron_flux_hdf5_path
 
+        ///
+        bool materials_from_xml;
+        
+        /// Filename of xml file to read materials from
+        std::string materials_xml_file;
+
+        /// Struct to store Material definitions
+        struct MaterialDefinition
+        {
+            std::string _mat_name;
+            double _mat_density;
+            std::vector<std::pair<std::string, double>> _m_atomic_composition;
+        };
+
+        /// Mappings from material name to material definitions
+        std::unorderedmap<std::string, MaterialDefinition>;
+        
 };
