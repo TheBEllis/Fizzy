@@ -10,12 +10,22 @@
 #include "fispactgroupconvert.hpp"
 #include "fispactelementaldata.hpp"
 #include "fispactutil.hpp"
+#include "fispactcompute.hpp"
+
  
 // Use fp as short for fispact
 namespace fp = fispact;
 
 class FispactProblem : public ExternalProblem
-{
+{    
+    /// Struct to store Material definitions
+    struct MaterialDefinition
+    {
+        std::string _mat_name;
+        std::vector<std::pair<std::string, double>> _mat_atomic_composition;
+        double _mat_density;
+    };
+
     public:
         // Constructor for FispactProblem
         FispactProblem(const InputParameters & params);
@@ -40,12 +50,12 @@ class FispactProblem : public ExternalProblem
         void setNuclearData(std::string nd_base_path);
 
         /// Read a neutron flux spectra from a hdf5 file
-        std::vector<double> readNeutronFluxFromH5(const std::string& filename);
+        std::vector<double> readNeutronFluxFromHDF5(const std::string& filename);
         
         /// Write output photon flux to HDF5
         void writePhotonFluxToHDF5(const std::string& filename);
 
-        void setFispactInputData(fp::Monitor& monitor, fp::InputData& ip, fp::OutputData& ip, std::vector<double> neutron_flux);        
+        void setFispactInputData(fp::FispactMonitor& monitor, fp::InputData& input, MaterialDefinition& material, std::vector<double>& neutron_flux, const std::vector<double>& bins, double volume);        
 
         /// Generate a log file name for the fispact logs
         std::string fispactLogName();
@@ -53,9 +63,11 @@ class FispactProblem : public ExternalProblem
         // Initialise FISPACT monitor object
         void initFispactMonitor(std::string);
 
-        void readNeutronFluxFromHDF5(std::string filename);
+        void readNeutronFluxFromHDF5(std::string filename, std::string tally_dir);
 
         void read_material_xml_data();
+
+        
     
         /// FISPACT monitor
         fp::FispactMonitor _fp_monitor;       
@@ -64,29 +76,32 @@ class FispactProblem : public ExternalProblem
         fp::NuclearData _fp_nuclear_data;      
 
         /// FISPACT neutron flux
-        std::vector<std::vector<double>> _neutron_flux;
+        std::unordered_map<int, std::vector<double>> _neutron_fluxes;
 
         /// hdf5 filename for neutron flux
         std::string _neutron_flux_filename;
         
         /// path to neutron flux array in hdf5 file
-        std::string _neutron_flux_hdf5_path
+        std::string _neutron_flux_hdf5_path;
 
         ///
-        bool materials_from_xml;
+        bool _materials_from_xml;
         
         /// Filename of xml file to read materials from
-        std::string materials_xml_file;
+        std::string _materials_xml_file;
 
-        /// Struct to store Material definitions
-        struct MaterialDefinition
-        {
-            std::string _mat_name;
-            double _mat_density;
-            std::vector<std::pair<std::string, double>> _m_atomic_composition;
-        };
 
         /// Mappings from material name to material definitions
-        std::unorderedmap<std::string, MaterialDefinition>;
-        
+        std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
+
+
+        MaterialDefinition& getElementMaterial(int &elem_id);
+
+        std::string _neutron_bin_type;
+
+        std::vector<double> _neutron_bins;
+
+        int _num_neutron_bins;
+
+        void setNeutronBins();
 };
