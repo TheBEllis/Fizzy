@@ -6,6 +6,8 @@
 /// PugiXML include
 #include "pugixml.hpp"
 
+registerMooseObject("FizzyApp", FispactProblem);
+
 InputParameters FispactProblem::validParams() {
   InputParameters params = ExternalProblem::validParams();
 
@@ -85,17 +87,25 @@ void FispactProblem::externalSolve() {
   fp::InputData fispact_input(_fp_monitor);
   fp::OutputData fispact_output(_fp_monitor);
 
-  for (MeshBase::element_iterator it = _mesh.activeLocalElementsBegin();
-       it != _mesh.activeLocalElementsEnd(); it++) {
-    int elem_id = (*it)->id();
+  for (MeshBase::element_iterator element_iter =
+           _mesh.activeLocalElementsBegin();
+       element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
+    // Get element id
+    int elem_id = (*element_iter)->id();
 
+    // Check if there is any neutron flux in current element
     bool is_zero_flux = std::all_of(_neutron_fluxes[elem_id].begin(),
                                     _neutron_fluxes[elem_id].end(),
                                     [](double j) { return j == 0; });
+
+    // If there is flux in the element, run FISPACT
     if (!is_zero_flux) {
+
+      // Here we are assuming the input mesh is in centremeters
+      double element_volume = (*element_iter)->volume();
       setFispactInputData(_fp_monitor, fispact_input,
                           getElementMaterial(elem_id), _neutron_fluxes[elem_id],
-                          fp::groups::G1102(), 10);
+                          _neutron_bins, element_volume);
     }
   }
 }
@@ -167,11 +177,12 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
     std::vector<double> neutron_flux_data(_num_neutron_bins, 0.0);
 
     // Set up counts and offsets for selecting hyperslab of tally array
-    hsize_t dataCount[3] = {_num_neutron_bins, 1, 1};
-    hsize_t dataOffset[3] = {(i * _num_neutron_bins), 0, 0};
+    hsize_t dataCount[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
+    hsize_t dataOffset[3] = {static_cast<hsize_t>((_num_neutron_bins * i)), 0,
+                             0};
 
     // Set up memory space for reading tally results
-    hsize_t arr_len[3] = {_num_neutron_bins, 1, 1};
+    hsize_t arr_len[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
     H5::DataSpace memspace_tally(1, arr_len);
     dspace_tally.selectHyperslab(H5S_SELECT_SET, dataCount, dataOffset);
 
@@ -193,6 +204,8 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
   }
 }
 
+// To do: Break up this function into setFispactInputFlux and
+// setFispactInputMaterial
 void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
                                          fp::InputData &input,
                                          MaterialDefinition &material,
@@ -218,6 +231,9 @@ void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
   std::vector<double> percent;
   for (auto &element_name_ao_pair : material._mat_atomic_composition) {
     std::string element_name = element_name_ao_pair.first;
+
+    /** Remove numbers from element name, isotope doesn't matter here as we're
+      obtaining the atomic number, not the atomic mass **/
     element_name.erase(
         std::remove_if(element_name.begin(), element_name.end(),
                        [](unsigned char c) { return std::isdigit(c); }),
