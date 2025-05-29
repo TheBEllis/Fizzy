@@ -1,107 +1,101 @@
 #pragma once
-
 #include "ExternalProblem.h"
 
-
-#include "fispactnucleardata.hpp"
-#include "fispactinputdata.hpp"
-#include "fispactoutputdata.hpp"
-#include "fispactgroupstructures.hpp"
-#include "fispactgroupconvert.hpp"
-#include "fispactelementaldata.hpp"
-#include "fispactutil.hpp"
 #include "fispactcompute.hpp"
+#include "fispactelementaldata.hpp"
+#include "fispactgroupconvert.hpp"
+#include "fispactgroupstructures.hpp"
+#include "fispactinputdata.hpp"
+#include "fispactnucleardata.hpp"
+#include "fispactoutputdata.hpp"
+#include "fispactutil.hpp"
 
- 
 // Use fp as short for fispact
 namespace fp = fispact;
 
-class FispactProblem : public ExternalProblem
-{    
-    /// Struct to store Material definitions
-    struct MaterialDefinition
-    {
-        std::string _mat_name;
-        std::vector<std::pair<std::string, double>> _mat_atomic_composition;
-        double _mat_density;
-    };
+class FispactProblem : public ExternalProblem {
+  /// Struct to store Material definitions
+  struct MaterialDefinition {
+    std::string _mat_name;
+    std::vector<std::pair<std::string, double>> _mat_atomic_composition;
+    double _mat_density;
+  };
 
-    public:
-        // Constructor for FispactProblem
-        FispactProblem(const InputParameters & params);
+public:
+  // Constructor for FispactProblem
+  FispactProblem(const InputParameters &params);
 
-        static InputParameters validParams();
+  static InputParameters validParams();
 
-        // virtual void initialSetup() override;
-        virtual void externalSolve() override;
-        // virtual void syncSolutions(ExternalProblem::Direction direction) override;
+  // virtual void initialSetup() override;
+  virtual void externalSolve() override;
+  // virtual void syncSolutions(ExternalProblem::Direction direction) override;
 
-        
-    private:
+private:
+  static void load_callback(std::string key, std::string path, int i, int t) {
+    std::cout << "\33[2K\r" << key << ": " << path << " [" << i << "/" << t
+              << "]" << std::flush;
+  }
 
-        static void load_callback(std::string key, std::string path, int i, int t){
-            std::cout << "\33[2K\r" << key << ": " << path << " [" << i << "/" << t << "]" << std::flush;
-        }
-        
-        static void process_callback(std::string process_name, int i, int t){
-            std::cout << "\33[2K\r [" << i << "/" << t << "] " << process_name << std::flush;
-        }
+  static void process_callback(std::string process_name, int i, int t) {
+    std::cout << "\33[2K\r [" << i << "/" << t << "] " << process_name
+              << std::flush;
+  }
 
-        void setNuclearData(std::string nd_base_path);
+  void setNuclearData(std::string nd_base_path);
 
-        /// Read a neutron flux spectra from a hdf5 file
-        std::vector<double> readNeutronFluxFromHDF5(const std::string& filename);
-        
-        /// Write output photon flux to HDF5
-        void writePhotonFluxToHDF5(const std::string& filename);
+  /// Read a neutron flux spectra from a hdf5 file
+  std::vector<double> readNeutronFluxFromHDF5(const std::string &filename);
 
-        void setFispactInputData(fp::FispactMonitor& monitor, fp::InputData& input, MaterialDefinition& material, std::vector<double>& neutron_flux, const std::vector<double>& bins, double volume);        
+  /// Write output photon flux to HDF5
+  void writePhotonFluxToHDF5(const std::string &filename);
 
-        /// Generate a log file name for the fispact logs
-        std::string fispactLogName();
-        
-        // Initialise FISPACT monitor object
-        void initFispactMonitor(std::string);
+  void setFispactInputData(fp::FispactMonitor &monitor, fp::InputData &input,
+                           MaterialDefinition &material,
+                           std::vector<double> &neutron_flux,
+                           const std::vector<double> &bins, double volume);
 
-        void readNeutronFluxFromHDF5(std::string filename, std::string tally_dir);
+  /// Generate a log file name for the fispact logs
+  std::string fispactLogName();
 
-        void read_material_xml_data();
+  // Initialise FISPACT monitor object
+  void initFispactMonitor(std::string);
 
-        
-    
-        /// FISPACT monitor
-        fp::FispactMonitor _fp_monitor;       
+  void readNeutronFluxFromHDF5(std::string filename, std::string tally_dir);
 
-        /// FISPACT nuclear data
-        fp::NuclearData _fp_nuclear_data;      
+  void read_material_xml_data();
 
-        /// FISPACT neutron flux
-        std::unordered_map<int, std::vector<double>> _neutron_fluxes;
+  /// FISPACT monitor
+  fp::FispactMonitor _fp_monitor;
 
-        /// hdf5 filename for neutron flux
-        std::string _neutron_flux_filename;
-        
-        /// path to neutron flux array in hdf5 file
-        std::string _neutron_flux_hdf5_path;
+  /// FISPACT nuclear data
+  fp::NuclearData _fp_nuclear_data;
 
-        ///
-        bool _materials_from_xml;
-        
-        /// Filename of xml file to read materials from
-        std::string _materials_xml_file;
+  /// FISPACT neutron flux
+  std::unordered_map<int, std::vector<double>> _neutron_fluxes;
 
+  /// hdf5 filename for neutron flux
+  std::string _neutron_flux_filename;
 
-        /// Mappings from material name to material definitions
-        std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
+  /// path to neutron flux array in hdf5 file
+  std::string _neutron_flux_hdf5_path;
 
+  ///
+  bool _materials_from_xml;
 
-        MaterialDefinition& getElementMaterial(int &elem_id);
+  /// Filename of xml file to read materials from
+  std::string _materials_xml_file;
 
-        std::string _neutron_bin_type;
+  /// Mappings from material name to material definitions
+  std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
 
-        std::vector<double> _neutron_bins;
+  MaterialDefinition &getElementMaterial(int &elem_id);
 
-        int _num_neutron_bins;
+  std::string _neutron_bin_type;
 
-        void setNeutronBins();
+  std::vector<double> _neutron_bins;
+
+  int _num_neutron_bins;
+
+  void setNeutronBins();
 };
