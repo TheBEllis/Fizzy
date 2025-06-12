@@ -2,7 +2,6 @@
 
 #include "GeneralUserObject.h"
 
-
 class FISPACTMaterial : public GeneralUserObject
 {   
 public:
@@ -17,11 +16,11 @@ public:
 protected:
   
     // Nuclide names
-    std::vector<std::string> & _nuclides;
+    std::vector<std::string> _nuclides;
   
     // List of nuclide proportions corresponding to each nuclide in the nuclide list 
-    std::vector<double> & _nuclide_proportion;
+    std::vector<double> _nuclide_proportion;
 
     // Density of the fispact material
-    double & _density;
+    double _density;
 };

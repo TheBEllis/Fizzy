@@ -20,9 +20,8 @@ FISPACTMaterial::validParams()
 
 FISPACTMaterial::FISPACTMaterial(const InputParameters & parameters)
     : GeneralUserObject(parameters),
-        _schedule(getParam<std::vector<int>>("schedule")),
-        _times(getParam<std::vector<double>>("times"))
+        _nuclides(getParam<std::vector<std::string>>("nuclides")),
+        _nuclide_proportion(getParam<std::vector<double>>("nuclide_proportions")),
+        _density(getParam<double>("density"))
 {
-    // Check vectors passed in are the right size
-    mooseAssert(_times.size() != _schedule.size() + 1, "The length of schedule must be one larger than the list of times");
 }
