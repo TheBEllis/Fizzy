@@ -4,7 +4,11 @@
 #include "H5Cpp.h"
 
 /// PugiXML include
+#include "MooseError.h"
 #include "pugixml.hpp"
+#include <filesystem>
+#include <iostream>
+#include <string>
 
 registerMooseObject("FizzyApp", FispactProblem);
 
@@ -64,9 +68,24 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _fp_nuclear_data(_fp_monitor),
       _neutron_flux_filename(getParam<std::string>("neutron_flux_file")),
       _neutron_flux_hdf5_path(getParam<std::string>("neutron_flux_hdf5_path")),
+      _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")) {
+
   // Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
+
+  // Load materials from xml file
+  if (_materials_from_xml) {
+    // Set file to get materials from
+    _materials_xml_file = getParam<std::string>("materials_xml_file");
+    // Populate _mat_definitions with materials from openmc xml
+    read_material_xml_data();
+  } else {
+    if (isParamSetByUser("materials_xml_file")) {
+      mooseError("materials_xml_file is set by user, but "
+                 "read_materials_from_xml is false!");
+    }
+  }
 
   // Get the path to our nuclear data
   std::string fp_nuclear_data_path =
@@ -75,11 +94,11 @@ FispactProblem::FispactProblem(const InputParameters &params)
   // Set nuclear data paths
   setNuclearData(fp_nuclear_data_path);
 
+  // Set neutron bin type
+  setNeutronBins();
+
   // Read neutron flux from HDF5
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
-
-  if (getParam<bool>("read_materials_from_xml")) {
-  }
 }
 
 void FispactProblem::externalSolve() {
@@ -100,12 +119,15 @@ void FispactProblem::externalSolve() {
 
     // If there is flux in the element, run FISPACT
     if (!is_zero_flux) {
-
+      _console << "CALCUMALATING " << std::endl;
       // Here we are assuming the input mesh is in centremeters
       double element_volume = (*element_iter)->volume();
       setFispactInputData(_fp_monitor, fispact_input,
                           getElementMaterial(elem_id), _neutron_fluxes[elem_id],
                           _neutron_bins, element_volume);
+      // Run FISPACT!
+      fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
+                  process_callback);
     }
   }
 }
@@ -148,6 +170,7 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
                                              std::string tally_dir) {
   // Open statepoint file as H5File
   H5::H5File h5f(filename.c_str(), H5F_ACC_RDONLY);
+
   // Create dataset and dataspace for the tally results
   H5::DataSet dataset_tally = h5f.openDataSet(tally_dir.c_str());
   H5::DataSpace dspace_tally = dataset_tally.getSpace();
@@ -270,7 +293,12 @@ FispactProblem::getElementMaterial(int &elem_id) {
 
   // Return material definition if it exists, otherwise throw error
   if (_mat_definitions.find(subdomain_name) != _mat_definitions.end()) {
-    return _mat_definitions[subdomain_name];
+    std::cout << subdomain_name << std::endl;
+    return _mat_definitions.at(subdomain_name);
+
+  } else if (_mat_definitions.find("steel") != _mat_definitions.end()) {
+    std::cout << subdomain_name << std::endl;
+    return _mat_definitions.at("steel");
   } else {
     mooseError("No FISPACT material named " + subdomain_name + " was found.");
   }
@@ -285,15 +313,14 @@ void FispactProblem::read_material_xml_data() {
 
   if (!result) {
     // mooseError();
-    std::cerr << "No file called " << _materials_xml_file
-              << " could be found, exiting." << std::endl;
-    std::exit;
+    mooseError("No file called " + _materials_xml_file +
+               " could be found, exiting.");
   }
   for (pugi::xml_node material : doc.child("materials").children()) {
 
     // Get material name
     std::string material_name = material.attribute("name").value();
-
+    std::cout << material_name << std::endl;
     // Get material density
     double density =
         std::stod(material.child("density").attribute("value").value());
