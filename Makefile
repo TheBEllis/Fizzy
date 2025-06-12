@@ -90,9 +90,14 @@ FISPACT_INCLUDES ?= -I ${FISPACT_DIR}/include/c -I ${FISPACT_DIR}/include/cpp
 FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/
 # FISPACT_LIB ?= 
 
-ADDITIONAL_LIBS := -L$(FISPACT_LIB_DIR) -lfispactapi -lfmt
-ADDITIONAL_LIBS += $(CC_LINKER_SLFLAG)$(FISPACT_LIB_DIR)
-# libmesh_CXX, etc, were defined in build.mk
+PUGIXML_DIR ?= $(MOOSE_DIR)/../pugixml/
+PUGIXML_INCLUDES ?= -I $(PUGIXML_DIR)/src/
+PUGIXML_LIB_DIR ?= ${PUGIXML_DIR}/build/
 
-ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES)
+HDF5_DIR ?= /usr/lib/x86_64-linux-gnu/hdf5/openmpi/lib/
+
+ADDITIONAL_LIBS := -L$(FISPACT_LIB_DIR) -ljsonfortran -lmonitor -lfispact -lfispactapi -lfmt -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5 -lhdf5_cpp
+ADDITIONAL_LIBS += $(CC_LINKER_SLFLAG)$(FISPACT_LIB_DIR)
+
+ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES) ${PUGIXML_INCLUDES}
 
