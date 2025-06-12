@@ -30,6 +30,7 @@ public:
   // virtual void initialSetup() override;
   virtual void externalSolve() override;
   virtual void syncSolutions(ExternalProblem::Direction direction) {};
+  virtual bool converged(unsigned int) override { return true; }
 
 private:
   static void load_callback(std::string key, std::string path, int i, int t) {
