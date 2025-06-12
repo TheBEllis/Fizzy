@@ -12,10 +12,13 @@ public:
   virtual void finalize() {}
   virtual void execute() {}
 
+  const std::vector<double> &getFluxSchedule();
+  const std::vector<double> &getTimes();
+
 protected:
   /// Vector of flux amplitudes
-  const std::vector<int32_t> &_schedule;
+  const std::vector<double> _flux_schedule;
 
   /// List of times corresponding to the list of flux amplitudes on or off
-  const std::vector<double> &_times;
+  const std::vector<double> _times;
 };

@@ -1,15 +1,19 @@
 #include "FispactProblem.h"
 
+#include "FispactSchedule.h"
 /// HDF5 include
 #include "H5Cpp.h"
 
 /// PugiXML include
 #include "MooseError.h"
+#include "MooseTypes.h"
+#include "fispactinputdata.hpp"
 #include "pugixml.hpp"
 #include <filesystem>
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <vector>
 
 registerMooseObject("FizzyApp", FispactProblem);
 
@@ -53,6 +57,10 @@ InputParameters FispactProblem::validParams() {
   params.addRequiredParam<std::string>("neutron_bin_type",
                                        "neutron binning scheme for FISPACT");
 
+  params.addRequiredParam<std::string>(
+      "fispact_schedule_uo", "Name of the FispactSchedule user object defining "
+                             "the FISPACT flux schedule");
+
   params.addParam<bool>(
       "read_materials_from_xml", false,
       "Parameter determining whether user wishes to read materaial nuclide "
@@ -70,7 +78,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _neutron_flux_filename(getParam<std::string>("neutron_flux_file")),
       _neutron_flux_hdf5_path(getParam<std::string>("neutron_flux_hdf5_path")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
-      _neutron_bin_type(getParam<std::string>("neutron_bin_type")) {
+      _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
+      _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")) {
 
   // Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
@@ -87,6 +96,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
                  "read_materials_from_xml is false!");
     }
   }
+
+  checkMaterialsExist();
 
   // Get the path to our nuclear data
   std::string fp_nuclear_data_path =
@@ -107,9 +118,13 @@ void FispactProblem::externalSolve() {
   fp::InputData fispact_input(_fp_monitor);
   fp::OutputData fispact_output(_fp_monitor);
 
+  int counter = 0;
   for (MeshBase::element_iterator element_iter =
            _mesh.activeLocalElementsBegin();
        element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
+
+    std::cout << counter << "/" << _mesh.getMesh().n_active_local_elem()
+              << std::endl;
     // Get element id
     int elem_id = (*element_iter)->id();
 
@@ -120,7 +135,6 @@ void FispactProblem::externalSolve() {
 
     // If there is flux in the element, run FISPACT
     if (!is_zero_flux) {
-      _console << "CALCUMALATING " << std::endl;
       // Here we are assuming the input mesh is in centremeters
       double element_volume = (*element_iter)->volume();
 
@@ -133,6 +147,8 @@ void FispactProblem::externalSolve() {
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
                   process_callback);
     }
+
+    counter++;
   }
 }
 
@@ -273,19 +289,15 @@ void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
 
   input.setMass(atomic_numbers, percent);
 
-  std::vector<double> irradiationtime = {5.0 * FISPACT_MIN_TO_SEC};
+  setFispactSchedule(input);
+}
 
-  // Check this, what does flux amplitude need to be?
-  std::vector<double> fluxamp = {1.116e10};
-  input.setSchedule(irradiationtime, fluxamp);
+void FispactProblem::setFispactSchedule(fp::InputData &input) {
+  FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
-  // std::vector<double> cooltimes = {36, 15, 16, 15, 15 ,26, 33, 36, 53, 66,
-  // 66, 97};
-  std::vector<double> cooltimes = {36, 15, 16};
-
-  for (double time : cooltimes) {
-    input.appendSchedule(time, 0.0);
-  }
+  const std::vector<double> &flux_schedule = schedule.getFluxSchedule();
+  const std::vector<double> &times = schedule.getTimes();
+  input.setSchedule(times, flux_schedule);
 }
 
 FispactProblem::MaterialDefinition &
@@ -297,12 +309,8 @@ FispactProblem::getElementMaterial(int &elem_id) {
 
   // Return material definition if it exists, otherwise throw error
   if (_mat_definitions.find(subdomain_name) != _mat_definitions.end()) {
-    std::cout << subdomain_name << std::endl;
     return _mat_definitions.at(subdomain_name);
 
-  } else if (_mat_definitions.find("steel") != _mat_definitions.end()) {
-    std::cout << subdomain_name << std::endl;
-    return _mat_definitions.at("steel");
   } else {
     mooseError("No FISPACT material named " + subdomain_name + " was found.");
   }
@@ -321,7 +329,6 @@ void FispactProblem::read_material_xml_data() {
 
     // Get material name
     std::string material_name = material.attribute("name").value();
-    std::cout << material_name << std::endl;
     // Get material density
     double density =
         std::stod(material.child("density").attribute("value").value());
@@ -338,7 +345,6 @@ void FispactProblem::read_material_xml_data() {
 
     // Create material definition
     MaterialDefinition material_def{material_name, atomic_comp, density};
-    _console << "ADDING MATERIAL" << std::endl;
     // Insert material definition into material map
     _mat_definitions.insert(std::make_pair(material_name, material_def));
   }
@@ -348,5 +354,22 @@ void FispactProblem::setNeutronBins() {
   if (_neutron_bin_type == "G1102") {
     _neutron_bins = fp::groups::G1102();
     _num_neutron_bins = 1102;
+  }
+}
+
+void FispactProblem::checkMaterialsExist() {
+  std::vector<unsigned short> subdomain_ids;
+  for (auto &subdomain_id : _mesh.meshSubdomains()) {
+    subdomain_ids.push_back(subdomain_id);
+  }
+
+  std::vector<SubdomainName> subdomain_names =
+      _mesh.getSubdomainNames(subdomain_ids);
+
+  for (auto &subdomain_name : subdomain_names) {
+    if (_mat_definitions.find(subdomain_name) == _mat_definitions.end()) {
+      mooseError("Block " + subdomain_name +
+                 " does not have a corresponding FISPACT material defined");
+    }
   }
 }

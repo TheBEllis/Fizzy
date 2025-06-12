@@ -9,6 +9,7 @@
 #include "fispactnucleardata.hpp"
 #include "fispactoutputdata.hpp"
 #include "fispactutil.hpp"
+#include <string>
 
 // Use fp as short for fispact
 namespace fp = fispact;
@@ -66,6 +67,19 @@ private:
 
   void read_material_xml_data();
 
+  /**
+   * Method to check that for all mesh subdomains, a corresponding
+   * FispactMaterial exists. This allows for the program to error out at the
+   * start as opposed to running into a subdomain lacking a material half way
+   * through the solve.
+   */
+  void checkMaterialsExist();
+
+  /**
+   * Retrieve Fispact radiation schedule from FispactSchedule UserObject
+   */
+  void setFispactSchedule(fp::InputData &input);
+
   /// FISPACT monitor
   fp::FispactMonitor _fp_monitor;
 
@@ -97,6 +111,8 @@ private:
   std::vector<double> _neutron_bins;
 
   int _num_neutron_bins;
+
+  std::string _schedule_uo_name;
 
   void setNeutronBins();
 };
