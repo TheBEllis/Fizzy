@@ -8,6 +8,7 @@
 #include "pugixml.hpp"
 #include <filesystem>
 #include <iostream>
+#include <ostream>
 #include <string>
 
 registerMooseObject("FizzyApp", FispactProblem);
@@ -122,9 +123,12 @@ void FispactProblem::externalSolve() {
       _console << "CALCUMALATING " << std::endl;
       // Here we are assuming the input mesh is in centremeters
       double element_volume = (*element_iter)->volume();
-      setFispactInputData(_fp_monitor, fispact_input,
-                          getElementMaterial(elem_id), _neutron_fluxes[elem_id],
-                          _neutron_bins, element_volume);
+
+      MaterialDefinition el_mat = getElementMaterial(elem_id);
+
+      setFispactInputData(_fp_monitor, fispact_input, el_mat,
+                          _neutron_fluxes[elem_id], _neutron_bins,
+                          element_volume);
       // Run FISPACT!
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
                   process_callback);
@@ -308,9 +312,6 @@ void FispactProblem::read_material_xml_data() {
   pugi::xml_document doc;
   pugi::xml_parse_result result = doc.load_file(_materials_xml_file.c_str());
 
-  std::unordered_map<std::string, FispactProblem::MaterialDefinition>
-      _mat_definitions;
-
   if (!result) {
     // mooseError();
     mooseError("No file called " + _materials_xml_file +
@@ -337,7 +338,7 @@ void FispactProblem::read_material_xml_data() {
 
     // Create material definition
     MaterialDefinition material_def{material_name, atomic_comp, density};
-
+    _console << "ADDING MATERIAL" << std::endl;
     // Insert material definition into material map
     _mat_definitions.insert(std::make_pair(material_name, material_def));
   }
