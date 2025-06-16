@@ -8,11 +8,22 @@
 #include "MooseError.h"
 #include "MooseTypes.h"
 #include "fispactinputdata.hpp"
+#include "mpi.h"
 #include "pugixml.hpp"
 #include <filesystem>
+#include <hdf5/openmpi/H5Dpublic.h>
+#include <hdf5/openmpi/H5FDmpio.h>
+#include <hdf5/openmpi/H5Fpublic.h>
+#include <hdf5/openmpi/H5Ipublic.h>
+#include <hdf5/openmpi/H5Ppublic.h>
+#include <hdf5/openmpi/H5Spublic.h>
+#include <hdf5/openmpi/H5public.h>
+#include <hdf5/openmpi/H5version.h>
 #include <iostream>
+#include <iterator>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 registerMooseObject("FizzyApp", FispactProblem);
@@ -119,6 +130,8 @@ void FispactProblem::externalSolve() {
   fp::OutputData fispact_output(_fp_monitor);
 
   int counter = 0;
+  std::cout << "Num local elems = " << _mesh.getMesh().n_active_local_elem()
+            << std::endl;
   for (MeshBase::element_iterator element_iter =
            _mesh.activeLocalElementsBegin();
        element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
@@ -128,11 +141,12 @@ void FispactProblem::externalSolve() {
     // Get element id
     int elem_id = (*element_iter)->id();
 
+    std::vector<double> photon_spectra(24, 0);
+
     // Check if there is any neutron flux in current element
     bool is_zero_flux = std::all_of(_neutron_fluxes[elem_id].begin(),
                                     _neutron_fluxes[elem_id].end(),
                                     [](double j) { return j == 0; });
-
     // If there is flux in the element, run FISPACT
     if (!is_zero_flux) {
       // Here we are assuming the input mesh is in centremeters
@@ -146,7 +160,16 @@ void FispactProblem::externalSolve() {
       // Run FISPACT!
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
                   process_callback);
+
+      convertGammaEvToCount(
+          fispact_input, fispact_output.getGammaSpectrumBins(1),
+          fispact_output.getGammaSpectrumBoundaries(0), photon_spectra);
     }
+
+    _photon_fluxes.insert(
+        std::pair<int, std::vector<double>>(elem_id, photon_spectra));
+
+    writePhotonFluxToHDF5("hdf5_photons.h5");
 
     counter++;
   }
@@ -184,6 +207,50 @@ void FispactProblem::setNuclearData(std::string nd_base_path) {
   nd_reader.setPath(FISPACT_ND_A2DATA_KEY, nd_base_path + "/decay/a2_2012");
 
   nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
+}
+
+void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
+  hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
+  H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+  auto testFile =
+      H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
+
+  // Loop over all MPI ranks
+  std::string dataset_name = "photon_data";
+  hsize_t dataspace_dims[2];
+
+  dataspace_dims[0] = _mesh.getMesh().n_active_elem();
+  dataspace_dims[1] = 24;
+
+  hid_t dataspace = H5Screate_simple(2, dataspace_dims, NULL);
+  hid_t h5_dataset =
+      H5Dcreate(testFile, dataset_name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  for (auto &pair : _photon_fluxes) {
+
+    std::vector<double> test_data(24, 12);
+    // Get the dataset's dataspace
+    hid_t dataset_dspace = H5Dget_space(h5_dataset);
+
+    hsize_t memory_dspace_dims[2] = {1, 24};
+    hid_t memory_dspace = H5Screate_simple(2, memory_dspace_dims, NULL);
+    hsize_t start[2] = {(hsize_t)pair.first, 0};
+    hsize_t stride[2] = {1, 1};
+    hsize_t count[2] = {1, 24};
+    hsize_t block[2] = {1, 1};
+    // Select the hyperslap of the dataspace that we wish to write to
+    H5Sselect_hyperslab(dataset_dspace, H5S_SELECT_SET, start, stride, count,
+                        block);
+    H5Dwrite(h5_dataset, H5T_NATIVE_DOUBLE, memory_dspace, dataset_dspace,
+             H5P_DEFAULT, pair.second.data());
+    H5Sclose(dataset_dspace);
+    H5Sclose(memory_dspace);
+  }
+  H5Sclose(dataspace);
+  H5Dclose(h5_dataset);
+  H5Fclose(testFile);
+  H5Pclose(plist_id);
 }
 
 void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
@@ -236,6 +303,7 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
     for (auto &neutron_flux : neutron_flux_data) {
       neutron_flux = neutron_flux / n_realizations;
     }
+    // Add neutron flux data to map
     neutron_fluxes[i] = neutron_flux_data;
   }
 
@@ -371,5 +439,31 @@ void FispactProblem::checkMaterialsExist() {
       mooseError("Block " + subdomain_name +
                  " does not have a corresponding FISPACT material defined");
     }
+  }
+}
+
+void FispactProblem::convertGammaEvToCount(
+    fp::InputData &input, const std::vector<double> &photon_spectra,
+    const std::vector<double> &photon_flux_bins,
+    std::vector<double> &photons_per_cc_per_s) {
+
+  // Reserve memory for photons per cc per s vector
+  photons_per_cc_per_s.resize(photon_spectra.size());
+
+  // Get inventory density and mass
+  double inv_density = input.getDensity();
+  double inv_mass = input.getMassTotal();
+
+  // Convert from MeV/s to per cc per s for each bin
+  for (int i = 0; i < photon_spectra.size(); i++) {
+    double bin_energy = photon_flux_bins[i] +
+                        ((photon_flux_bins[i + 1] - photon_flux_bins[i]) / 2);
+
+    // per_cc_per_s = MeV/s * (inventory_density/(inventory_mass *
+    // energy_bin_midpoint))
+    double per_cc_per_s =
+        photon_spectra[i] * (inv_density / (inv_mass * bin_energy));
+
+    photons_per_cc_per_s[i] = per_cc_per_s;
   }
 }

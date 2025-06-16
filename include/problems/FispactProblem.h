@@ -80,6 +80,11 @@ private:
    */
   void setFispactSchedule(fp::InputData &input);
 
+  void convertGammaEvToCount(fp::InputData &input,
+                             const std::vector<double> &photon_spectra,
+                             const std::vector<double> &photon_flux_bins,
+                             std::vector<double> &photons_per_cc_per_s);
+
   /// FISPACT monitor
   fp::FispactMonitor _fp_monitor;
 
@@ -88,6 +93,9 @@ private:
 
   /// FISPACT neutron flux
   std::unordered_map<int, std::vector<double>> _neutron_fluxes;
+
+  // FISPACT Photon fluxes
+  std::unordered_map<int, std::vector<double>> _photon_fluxes;
 
   /// hdf5 filename for neutron flux
   std::string _neutron_flux_filename;
