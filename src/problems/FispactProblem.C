@@ -1,3 +1,4 @@
+#include "ExternalProblem.h"
 #include "FispactProblem.h"
 
 #include "FispactSchedule.h"
@@ -7,6 +8,7 @@
 /// PugiXML include
 #include "MooseError.h"
 #include "MooseTypes.h"
+#include "fispactcompute.hpp"
 #include "fispactinputdata.hpp"
 #include "mpi.h"
 #include "pugixml.hpp"
@@ -91,7 +93,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
       _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")) {
-
+  _console << "Constructor" << std::endl;
   // Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
 
@@ -124,23 +126,25 @@ FispactProblem::FispactProblem(const InputParameters &params)
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
 }
 
+void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {}
+
 void FispactProblem::externalSolve() {
   // Set up fispact input data
   fp::InputData fispact_input(_fp_monitor);
   fp::OutputData fispact_output(_fp_monitor);
 
-  int counter = 0;
+  int counter = 1;
   std::cout << "Num local elems = " << _mesh.getMesh().n_active_local_elem()
             << std::endl;
-  for (MeshBase::element_iterator element_iter =
-           _mesh.activeLocalElementsBegin();
-       element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
+  // for (MeshBase::element_iterator element_iter =
+  //          _mesh.activeLocalElementsBegin();
+  //      element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
+  for (auto element_iter : *_mesh.getActiveLocalElementRange()) {
 
-    std::cout << counter << "/" << _mesh.getMesh().n_active_local_elem()
-              << std::endl;
+    _console << "starting " + std::to_string(counter) << std::endl;
     // Get element id
-    int elem_id = (*element_iter)->id();
-
+    int elem_id = (element_iter)->id();
+    _console << "Elem ID" << std::to_string(elem_id) << std::endl;
     std::vector<double> photon_spectra(24, 0);
 
     // Check if there is any neutron flux in current element
@@ -150,14 +154,14 @@ void FispactProblem::externalSolve() {
     // If there is flux in the element, run FISPACT
     if (!is_zero_flux) {
       // Here we are assuming the input mesh is in centremeters
-      double element_volume = (*element_iter)->volume();
+      double element_volume = (element_iter)->volume();
 
       MaterialDefinition el_mat = getElementMaterial(elem_id);
 
       setFispactInputData(_fp_monitor, fispact_input, el_mat,
                           _neutron_fluxes[elem_id], _neutron_bins,
                           element_volume);
-      // Run FISPACT!
+      // Run FISPACT
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
                   process_callback);
 
@@ -168,11 +172,17 @@ void FispactProblem::externalSolve() {
 
     _photon_fluxes.insert(
         std::pair<int, std::vector<double>>(elem_id, photon_spectra));
+    //
 
-    writePhotonFluxToHDF5("hdf5_photons.h5");
+    // Output how many elements have been checked
+    _console << counter << "/" << _mesh.getMesh().n_active_local_elem()
+             << std::endl;
 
     counter++;
   }
+  writePhotonFluxToHDF5("hdf5_photons.h5");
+  fp::GlobalFinalise(_fp_monitor);
+  _console << "Externally Solved" << std::endl;
 }
 
 std::string FispactProblem::fispactLogName() {
@@ -210,11 +220,14 @@ void FispactProblem::setNuclearData(std::string nd_base_path) {
 }
 
 void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
+  MPI_Comm comm = MPI_COMM_WORLD;
+  MPI_Info info = MPI_INFO_NULL;
+
   hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
-  H5Pset_fapl_mpio(plist_id, MPI_COMM_WORLD, MPI_INFO_NULL);
+  H5Pset_fapl_mpio(plist_id, comm, info);
   auto testFile =
       H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
-
+  H5Pclose(plist_id);
   // Loop over all MPI ranks
   std::string dataset_name = "photon_data";
   hsize_t dataspace_dims[2];
@@ -222,35 +235,38 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
   dataspace_dims[0] = _mesh.getMesh().n_active_elem();
   dataspace_dims[1] = 24;
 
-  hid_t dataspace = H5Screate_simple(2, dataspace_dims, NULL);
+  hid_t filespace = H5Screate_simple(2, dataspace_dims, NULL);
   hid_t h5_dataset =
-      H5Dcreate(testFile, dataset_name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+      H5Dcreate(testFile, dataset_name.c_str(), H5T_NATIVE_DOUBLE, filespace,
                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Sclose(filespace);
 
+  filespace = H5Dget_space(h5_dataset);
   for (auto &pair : _photon_fluxes) {
 
     std::vector<double> test_data(24, 12);
     // Get the dataset's dataspace
-    hid_t dataset_dspace = H5Dget_space(h5_dataset);
 
     hsize_t memory_dspace_dims[2] = {1, 24};
-    hid_t memory_dspace = H5Screate_simple(2, memory_dspace_dims, NULL);
-    hsize_t start[2] = {(hsize_t)pair.first, 0};
-    hsize_t stride[2] = {1, 1};
+    hid_t memspace = H5Screate_simple(2, memory_dspace_dims, NULL);
+    hsize_t offset[2] = {(hsize_t)pair.first, 0};
+    // hsize_t stride[2] = {1, 1};
     hsize_t count[2] = {1, 24};
-    hsize_t block[2] = {1, 1};
+    // hsize_t block[2] = {1, 1};
     // Select the hyperslap of the dataspace that we wish to write to
-    H5Sselect_hyperslab(dataset_dspace, H5S_SELECT_SET, start, stride, count,
-                        block);
-    H5Dwrite(h5_dataset, H5T_NATIVE_DOUBLE, memory_dspace, dataset_dspace,
-             H5P_DEFAULT, pair.second.data());
-    H5Sclose(dataset_dspace);
-    H5Sclose(memory_dspace);
+    H5Sselect_hyperslab(filespace, H5S_SELECT_SET, offset, NULL, count, NULL);
+
+    plist_id = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist_id, H5FD_MPIO_INDEPENDENT);
+
+    H5Dwrite(h5_dataset, H5T_NATIVE_DOUBLE, memspace, filespace, plist_id,
+             pair.second.data());
+    H5Sclose(memspace);
   }
-  H5Sclose(dataspace);
+  H5Sclose(filespace);
   H5Dclose(h5_dataset);
-  H5Fclose(testFile);
   H5Pclose(plist_id);
+  H5Fclose(testFile);
 }
 
 void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
