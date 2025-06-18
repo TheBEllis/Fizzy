@@ -21,7 +21,7 @@ FispactSchedule::FispactSchedule(const InputParameters &parameters)
       _flux_schedule(getParam<std::vector<double>>("flux_schedule")),
       _times(getParam<std::vector<double>>("times")) {
   // Check vectors passed in are the right size
-  mooseAssert(_times.size() == _flux_schedule.size() + 1,
+  mooseAssert(_times.size() == _flux_schedule.size(),
               "The length of the flux_schdule and times must be equal");
 }
 
