@@ -224,14 +224,20 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
   MPI_Info info = MPI_INFO_NULL;
 
   hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
+
+  // Set HDF5 driver
   H5Pset_fapl_mpio(plist_id, comm, info);
+
+  // Create HDF5 file
   auto testFile =
       H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
   H5Pclose(plist_id);
+
   // Loop over all MPI ranks
   std::string dataset_name = "photon_data";
   hsize_t dataspace_dims[2];
 
+  // Set up dimensions for photon flux dataspace
   dataspace_dims[0] = _mesh.getMesh().n_active_elem();
   dataspace_dims[1] = 24;
 
@@ -241,28 +247,43 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   H5Sclose(filespace);
 
+  // Get dataspace corresponding to the hdf5 dataset
   filespace = H5Dget_space(h5_dataset);
-  for (auto &pair : _photon_fluxes) {
 
-    std::vector<double> test_data(24, 12);
-    // Get the dataset's dataspace
+  for (auto &element_flux_pair : _photon_fluxes) {
 
+    // CONTEXT: A hyperslab is a section of a hdf5 dataspace, don't be put off
+    // by the fancy name
+
+    // Create hdf5 dataspace to be our memory space for writing
     hsize_t memory_dspace_dims[2] = {1, 24};
     hid_t memspace = H5Screate_simple(2, memory_dspace_dims, NULL);
-    hsize_t offset[2] = {(hsize_t)pair.first, 0};
-    // hsize_t stride[2] = {1, 1};
+
+    // Retrieve element id from _photon_fluxes map
+    hsize_t element_id = (hsize_t)element_flux_pair.first;
+
+    // offset and count are used to select our hyperslab.
+    // Given the dimensions of the dataspace are num_elems * 24, our offset
+    // selection should be the element_id who's flux we wish to write
+    hsize_t offset[2] = {element_id, 0};
+
+    // count specifies the number of entries we wish to write in each dimension
     hsize_t count[2] = {1, 24};
-    // hsize_t block[2] = {1, 1};
-    // Select the hyperslap of the dataspace that we wish to write to
+
+    // Select the hyperslab of the dataspace that we wish to write to
     H5Sselect_hyperslab(filespace, H5S_SELECT_SET, offset, NULL, count, NULL);
 
+    // Set data transfer mode
     plist_id = H5Pcreate(H5P_DATASET_XFER);
     H5Pset_dxpl_mpio(plist_id, H5FD_MPIO_INDEPENDENT);
 
+    // Write the data
     H5Dwrite(h5_dataset, H5T_NATIVE_DOUBLE, memspace, filespace, plist_id,
-             pair.second.data());
+             element_flux_pair.second.data());
     H5Sclose(memspace);
   }
+
+  // Close all the HDF5 bits and pieces
   H5Sclose(filespace);
   H5Dclose(h5_dataset);
   H5Pclose(plist_id);
