@@ -30,7 +30,7 @@ public:
 
   // virtual void initialSetup() override;
   virtual void externalSolve() override;
-  virtual void syncSolutions(ExternalProblem::Direction direction) {};
+  virtual void syncSolutions(ExternalProblem::Direction direction) override;
   virtual bool converged(unsigned int) override { return true; }
 
 private:
@@ -85,6 +85,16 @@ private:
                              const std::vector<double> &photon_flux_bins,
                              std::vector<double> &photons_per_cc_per_s);
 
+  void printInventoryByHeat(fp::OutputData &output, int timestep_index,
+                            std::ostream &stream = std::cout);
+
+  void printInventoryByMass(fp::OutputData &output, int timestep_index,
+                            std::ostream &stream);
+
+  void printInvData(fp::OutputData &output, std::ostream &stream);
+
+  double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
+
   /// FISPACT monitor
   fp::FispactMonitor _fp_monitor;
 
@@ -103,8 +113,14 @@ private:
   /// path to neutron flux array in hdf5 file
   std::string _neutron_flux_hdf5_path;
 
+  /// hdf5 filename for photon flux
+  std::string _photon_flux_filename;
+
   ///
   bool _materials_from_xml;
+
+  /// Boolean to determine whether a rank is still running FISPACT calculations
+  bool _calculating = true;
 
   /// Filename of xml file to read materials from
   std::string _materials_xml_file;
