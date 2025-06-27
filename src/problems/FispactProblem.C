@@ -105,8 +105,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
       _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")) {
   _console << "Constructor" << std::endl;
-  // Initialise FISPACT
-  fp::GlobalInitialise(_fp_monitor);
 
   // Load materials from xml file
   if (_materials_from_xml) {
@@ -121,7 +119,11 @@ FispactProblem::FispactProblem(const InputParameters &params)
     }
   }
 
+  // Check a corresponding material exists for all mesh blocks
   checkMaterialsExist();
+
+  // Initialise FISPACT
+  fp::GlobalInitialise(_fp_monitor);
 
   // Get the path to our nuclear data
   std::string fp_nuclear_data_path =
@@ -133,7 +135,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
   // Set neutron bin type
   setNeutronBins();
 
-  // Read neutron flux from HDF5
+  // Read neutron flux from h5 file
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
 }
 
@@ -145,11 +147,6 @@ void FispactProblem::externalSolve() {
   fp::OutputData fispact_output(_fp_monitor);
 
   int counter = 1;
-  std::cout << "Num local elems = " << _mesh.getMesh().n_active_local_elem()
-            << std::endl;
-  // for (MeshBase::element_iterator element_iter =
-  //          _mesh.activeLocalElementsBegin();
-  //      element_iter != _mesh.activeLocalElementsEnd(); element_iter++) {
   for (auto element_iter : *_mesh.getActiveLocalElementRange()) {
 
     _console << "starting " + std::to_string(counter) << std::endl;
@@ -159,15 +156,15 @@ void FispactProblem::externalSolve() {
     std::vector<double> photon_spectra(24, 0);
 
     // Check if there is any neutron flux in current element
-    bool is_zero_flux = std::all_of(_neutron_fluxes[elem_id].begin(),
-                                    _neutron_fluxes[elem_id].end(),
-                                    [](double j) { return j == 0; });
+    bool is_flux = isFlux(elem_id);
+
     // If there is flux in the element, run FISPACT
-    if (!is_zero_flux) {
+    if (is_flux) {
       // Here we are assuming the input mesh is in centremeters
       double element_volume = (element_iter)->volume();
 
-      MaterialDefinition el_mat = getElementMaterial(elem_id);
+      // Get element material definition
+      MaterialDefinition &el_mat = getElementMaterial(elem_id);
 
       setFispactInputData(_fp_monitor, fispact_input, el_mat,
                           _neutron_fluxes[elem_id], _neutron_bins,
@@ -183,29 +180,10 @@ void FispactProblem::externalSolve() {
 
     _photon_fluxes.insert(
         std::pair<int, std::vector<double>>(elem_id, photon_spectra));
-    //
 
     // Output how many elements have been checked
-    _console << counter << "/" << _mesh.getMesh().n_active_local_elem()
+    _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
              << std::endl;
-
-    std::ofstream materials_out("fiz.csv");
-    counter++;
-    // printInvData(fispact_output, materials_out);
-    // if (elem_id == 0) {
-    //   std::ofstream materials_out("fiz.csv");
-    //   printInventoryByHeat(fispact_output, 1, materials_out);
-    //   materials_out << std::endl;
-    //   printInventoryByHeat(fispact_output, 2, materials_out);
-    //   materials_out << std::endl;
-    //   printInventoryByHeat(fispact_output, 3, materials_out);
-    //   materials_out << std::endl;
-    //   printInventoryByHeat(fispact_output, 4, materials_out);
-    //   materials_out << std::endl;
-    //   printInventoryByHeat(fispact_output, 5, materials_out);
-    //   materials_out << std::endl;
-    //   printInventoryByHeat(fispact_output, 6, materials_out);
-    // }
   }
 
   writePhotonFluxToHDF5(_photon_flux_filename);
@@ -332,6 +310,13 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
   hsize_t tally_array_dims[3];
   dspace_tally.getSimpleExtentDims(tally_array_dims, NULL);
 
+  if (tally_array_dims[0] != _mesh.nElem() * _num_neutron_bins) {
+    _console << tally_array_dims[0] << std::endl;
+    _console << _mesh.nElem() << std::endl;
+    _console << _mesh.nElem() * tally_array_dims[0] << std::endl;
+    // mooseError("Neutron flux file is incorrect dimension");
+  }
+
   // Read in number of realizations to calculate mean
   // Set up dataset and dataspace for reading realization count
   int n_realizations;
@@ -450,6 +435,16 @@ FispactProblem::getElementMaterial(int &elem_id) {
   }
 }
 
+bool FispactProblem::isFlux(int elem_id) {
+  // Check if there is any neutron flux in current element
+  bool is_zero_flux = std::all_of(_neutron_fluxes.at(elem_id).begin(),
+                                  _neutron_fluxes.at(elem_id).end(),
+                                  [](double j) { return j == 0; });
+  // return true if there is flux, false if there isn't, as the function name
+  // implies
+  return !is_zero_flux;
+}
+
 void FispactProblem::read_material_xml_data() {
   pugi::xml_document doc;
   pugi::xml_parse_result result = doc.load_file(_materials_xml_file.c_str());
@@ -538,87 +533,87 @@ void FispactProblem::convertGammaEvToCount(
   }
 }
 
-double FispactProblem::extractHalflifeFromNuc(fp::NuclearData &nuclear_data,
-                                              int zai) {
-  int num_zais = nuclear_data.getDecayDataSize();
-
-  std::vector<int> decay_zais = nuclear_data.getDecayZais();
-  for (int i = 0; i < num_zais + 1; i++) {
-    if (decay_zais[i] == zai) {
-      double halflife = nuclear_data.getDecayHalfLife(i);
-      return halflife;
-    }
-  }
-  return -1.0;
-}
-
-void FispactProblem::printInventoryByHeat(fp::OutputData &output,
-                                          int timestep_index,
-                                          std::ostream &stream) {
-  double mass = output.getInventoryValue(
-      timestep_index, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
-
-  std::pair<std::vector<int>, std::vector<double>> dom_sort =
-      output.getSortedInventory(timestep_index,
-                                FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-
-  std::vector<int> dom_zai = std::get<0>(dom_sort);
-  std::vector<double> dom_heat = std::get<1>(dom_sort);
-
-  int num_nuclides = dom_zai.size();
-  for (int i = (num_nuclides - 8); i < num_nuclides; i++) {
-    double heating = dom_heat[i] / mass;
-    double halflife = extractHalflifeFromNuc(_fp_nuclear_data, dom_zai[i]);
-    if (halflife != -1.0) {
-      std::string nuclide_name =
-          fp::util::GetNuclideName(_fp_monitor, dom_zai[i]);
-
-      // stream << std::setw(15) << halflife / FISPACT_YEAR_TO_SEC <<
-      // std::setw(15)
-      //        << heating << std::setw(15) << nuclide_name << "\n";
-      stream << heating << "," << nuclide_name << "\n";
-    }
-  }
-}
-
-void FispactProblem::printInvData(fp::OutputData &output,
-                                  std::ostream &stream) {
-  double mass =
-      output.getInventoryValue(0, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
-
-  std::pair<std::vector<int>, std::vector<double>> dom_sort =
-      output.getSortedInventory(1, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-
-  std::vector<int> dom_zai = std::get<0>(dom_sort);
-  std::vector<double> dom_heat = std::get<1>(dom_sort);
-
-  std::vector<int> chosen_zai(dom_zai.end() - 8, dom_zai.end());
-
-  for (auto zai : chosen_zai) {
-    std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor, zai);
-    stream << nuclide_name << ",";
-  }
-
-  stream << std::endl;
-
-  for (int time = 1; time < 6; time++) {
-
-    std::pair<std::vector<int>, std::vector<double>> timestep_sort =
-        output.getSortedInventory(time,
-                                  FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-    std::vector<int> time_zai = std::get<0>(timestep_sort);
-    std::vector<double> time_heat = std::get<1>(timestep_sort);
-
-    for (int j = 0; j < time_zai.size(); j++) {
-      int zai = time_zai[j];
-      if (std::find(chosen_zai.begin(), chosen_zai.end(), zai) !=
-          chosen_zai.end()) {
-        std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor, zai);
-        double heating = time_heat[j] / mass;
-        // std::cout << heating << std::endl;
-        stream << heating << ",";
-      }
-    }
-    stream << std::endl;
-  }
-}
+// double FispactProblem::extractHalflifeFromNuc(fp::NuclearData &nuclear_data,
+//                                               int zai) {
+//   int num_zais = nuclear_data.getDecayDataSize();
+//
+//   std::vector<int> decay_zais = nuclear_data.getDecayZais();
+//   for (int i = 0; i < num_zais + 1; i++) {
+//     if (decay_zais[i] == zai) {
+//       double halflife = nuclear_data.getDecayHalfLife(i);
+//       return halflife;
+//     }
+//   }
+//   return -1.0;
+// }
+//
+// void FispactProblem::printInventoryByHeat(fp::OutputData &output,
+//                                           int timestep_index,
+//                                           std::ostream &stream) {
+//   double mass = output.getInventoryValue(
+//       timestep_index, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
+//
+//   std::pair<std::vector<int>, std::vector<double>> dom_sort =
+//       output.getSortedInventory(timestep_index,
+//                                 FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
+//
+//   std::vector<int> dom_zai = std::get<0>(dom_sort);
+//   std::vector<double> dom_heat = std::get<1>(dom_sort);
+//
+//   int num_nuclides = dom_zai.size();
+//   for (int i = (num_nuclides - 8); i < num_nuclides; i++) {
+//     double heating = dom_heat[i] / mass;
+//     double halflife = extractHalflifeFromNuc(_fp_nuclear_data, dom_zai[i]);
+//     if (halflife != -1.0) {
+//       std::string nuclide_name =
+//           fp::util::GetNuclideName(_fp_monitor, dom_zai[i]);
+//
+//       // stream << std::setw(15) << halflife / FISPACT_YEAR_TO_SEC <<
+//       // std::setw(15)
+//       //        << heating << std::setw(15) << nuclide_name << "\n";
+//       stream << heating << "," << nuclide_name << "\n";
+//     }
+//   }
+// }
+//
+// void FispactProblem::printInvData(fp::OutputData &output,
+//                                   std::ostream &stream) {
+//   double mass =
+//       output.getInventoryValue(0, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
+//
+//   std::pair<std::vector<int>, std::vector<double>> dom_sort =
+//       output.getSortedInventory(1, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
+//
+//   std::vector<int> dom_zai = std::get<0>(dom_sort);
+//   std::vector<double> dom_heat = std::get<1>(dom_sort);
+//
+//   std::vector<int> chosen_zai(dom_zai.end() - 8, dom_zai.end());
+//
+//   for (auto zai : chosen_zai) {
+//     std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor, zai);
+//     stream << nuclide_name << ",";
+//   }
+//
+//   stream << std::endl;
+//
+//   for (int time = 1; time < 6; time++) {
+//
+//     std::pair<std::vector<int>, std::vector<double>> timestep_sort =
+//         output.getSortedInventory(time,
+//                                   FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
+//     std::vector<int> time_zai = std::get<0>(timestep_sort);
+//     std::vector<double> time_heat = std::get<1>(timestep_sort);
+//
+//     for (int j = 0; j < time_zai.size(); j++) {
+//       int zai = time_zai[j];
+//       if (std::find(chosen_zai.begin(), chosen_zai.end(), zai) !=
+//           chosen_zai.end()) {
+//         std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor,
+//         zai); double heating = time_heat[j] / mass;
+//         // std::cout << heating << std::endl;
+//         stream << heating << ",";
+//       }
+//     }
+//     stream << std::endl;
+//   }
+// }

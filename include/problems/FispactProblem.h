@@ -95,6 +95,8 @@ private:
 
   double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
 
+  bool isFlux(int elem_id);
+
   /// FISPACT monitor
   fp::FispactMonitor _fp_monitor;
 
