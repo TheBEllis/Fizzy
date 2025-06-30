@@ -25,6 +25,7 @@
 #include <hdf5/openmpi/H5Ipublic.h>
 #include <hdf5/openmpi/H5Ppublic.h>
 #include <hdf5/openmpi/H5Spublic.h>
+#include <hdf5/openmpi/H5Tpublic.h>
 #include <hdf5/openmpi/H5public.h>
 #include <hdf5/openmpi/H5version.h>
 #include <iostream>
@@ -137,6 +138,10 @@ FispactProblem::FispactProblem(const InputParameters &params)
 
   // Read neutron flux from h5 file
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
+  _console << _neutron_fluxes.size() << std::endl;
+  for (auto &flux : _neutron_fluxes.at(0)) {
+    _console << flux << " " << std::endl;
+  }
 }
 
 void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {}
@@ -299,63 +304,87 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
 
 void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
                                              std::string tally_dir) {
-  // Open statepoint file as H5File
-  H5::H5File h5f(filename.c_str(), H5F_ACC_RDONLY);
 
+  MPI_Comm comm = MPI_COMM_WORLD;
+  MPI_Info info = MPI_INFO_NULL;
+  // Set access properties
+  hid_t plist_id = H5Pcreate(H5P_FILE_ACCESS);
+
+  H5Pset_all_coll_metadata_ops(plist_id, true);
+  H5Pset_coll_metadata_write(plist_id, true);
+  // Set HDF5 driver
+  H5Pset_fapl_mpio(plist_id, comm, info);
+  // Open statepoint file as H5File
+  hid_t file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, plist_id);
+  H5Pclose(plist_id);
   // Create dataset and dataspace for the tally results
-  H5::DataSet dataset_tally = h5f.openDataSet(tally_dir.c_str());
-  H5::DataSpace dspace_tally = dataset_tally.getSpace();
+  hid_t dataset_tally_id = H5Dopen(file_id, tally_dir.c_str(), H5P_DEFAULT);
+  hid_t space_tally_id = H5Dget_space(dataset_tally_id);
 
   // Read in dimensions of tally results array
   hsize_t tally_array_dims[3];
-  dspace_tally.getSimpleExtentDims(tally_array_dims, NULL);
+  H5Sget_simple_extent_dims(space_tally_id, tally_array_dims, NULL);
 
+  // Check that the neutron flux we are reading is suitable for this mesh
   if (tally_array_dims[0] != _mesh.nElem() * _num_neutron_bins) {
-    _console << tally_array_dims[0] << std::endl;
-    _console << _mesh.nElem() << std::endl;
-    _console << _mesh.nElem() * tally_array_dims[0] << std::endl;
-    // mooseError("Neutron flux file is incorrect dimension");
+    mooseError("Neutron flux file is incorrect dimension");
   }
 
   // Read in number of realizations to calculate mean
   // Set up dataset and dataspace for reading realization count
   int n_realizations;
-  H5::DataSet dataset_realizations = h5f.openDataSet("n_realizations");
-  H5::DataSpace dspace_realizations = dataset_realizations.getSpace();
+  hid_t dataset_realizations_id =
+      H5Dopen(file_id, "n_realizations", H5P_DEFAULT);
+  hid_t space_realizations_id = H5Dget_space(dataset_realizations_id);
 
   // Set up memory space for reading realization (batch) count
   hsize_t memspace_dimensions_realizations[3] = {1, 1, 1};
-  H5::DataSpace memspace_realizations(1, memspace_dimensions_realizations);
-  dataset_realizations.read(&n_realizations, H5::PredType::STD_I32LE,
-                            memspace_realizations, dspace_realizations);
+  hid_t memspace_realizations_id =
+      H5Screate_simple(1, memspace_dimensions_realizations, nullptr);
+
+  H5Dread(dataset_realizations_id, H5T_STD_I32LE, memspace_realizations_id,
+          space_realizations_id, H5P_DEFAULT, &n_realizations);
+
+  // Close realizations hdf5 structures
+  H5Sclose(space_realizations_id);
+  H5Sclose(memspace_realizations_id);
+  H5Dclose(dataset_realizations_id);
 
   // Set up vector of vectors to store neutron fluxes
   std::vector<std::vector<double>> neutron_fluxes(
       tally_array_dims[0] / _num_neutron_bins,
       std::vector<double>(_num_neutron_bins, 0));
+
   for (int i = 0; i < neutron_fluxes.size(); i++) {
     // Set up std::vector to store neutron flux data
     std::vector<double> neutron_flux_data(_num_neutron_bins, 0.0);
 
     // Set up counts and offsets for selecting hyperslab of tally array
-    hsize_t dataCount[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
-    hsize_t dataOffset[3] = {static_cast<hsize_t>((_num_neutron_bins * i)), 0,
-                             0};
+    hsize_t data_count[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
+    hsize_t data_offset[3] = {static_cast<hsize_t>((_num_neutron_bins * i)), 0,
+                              0};
 
     // Set up memory space for reading tally results
     hsize_t arr_len[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
-    H5::DataSpace memspace_tally(1, arr_len);
-    dspace_tally.selectHyperslab(H5S_SELECT_SET, dataCount, dataOffset);
+    hid_t memspace_tally_id = H5Screate_simple(1, arr_len, NULL);
+    H5Sselect_hyperslab(space_tally_id, H5S_SELECT_SET, data_offset, NULL,
+                        data_count, NULL);
 
+    plist_id = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist_id, H5FD_MPIO_INDEPENDENT);
     // Read in neutron flux tally results
-    dataset_tally.read(neutron_flux_data.data(), H5::PredType::IEEE_F64LE,
-                       memspace_tally, dspace_tally);
+    H5Dread(dataset_tally_id, H5T_IEEE_F64LE, memspace_tally_id, space_tally_id,
+            H5P_DEFAULT, neutron_flux_data.data());
 
     for (auto &neutron_flux : neutron_flux_data) {
       neutron_flux = neutron_flux / n_realizations;
     }
     // Add neutron flux data to map
     neutron_fluxes[i] = neutron_flux_data;
+
+    // Close memspace dataspace
+    H5Sclose(memspace_tally_id);
+    H5Pclose(plist_id);
   }
 
   // for now, only keep neutron fluxes for local elements
@@ -364,6 +393,9 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
     int elem_id = (*it)->id();
     _neutron_fluxes.insert(std::make_pair(elem_id, neutron_fluxes[elem_id]));
   }
+  H5Dclose(dataset_tally_id);
+  H5Sclose(space_tally_id);
+  H5Fclose(file_id);
 }
 
 // To do: Break up this function into setFispactInputFlux and
@@ -385,7 +417,8 @@ void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
   input.setDensity(material._mat_density);
   input.setAtomsThreshold(1.0e3);
 
-  // Volume read in is in cm ^ 3, so we need to scale by 1e-6, as mass is in kg
+  // Volume read in is in cm ^ 3, so we need to scale by 1e-6, as mass is in
+  // kg
   double total_mass = material._mat_density * volume * 1e-6;
   input.setMassTotal(total_mass);
 
@@ -533,7 +566,8 @@ void FispactProblem::convertGammaEvToCount(
   }
 }
 
-// double FispactProblem::extractHalflifeFromNuc(fp::NuclearData &nuclear_data,
+// double FispactProblem::extractHalflifeFromNuc(fp::NuclearData
+// &nuclear_data,
 //                                               int zai) {
 //   int num_zais = nuclear_data.getDecayDataSize();
 //
@@ -579,10 +613,12 @@ void FispactProblem::convertGammaEvToCount(
 // void FispactProblem::printInvData(fp::OutputData &output,
 //                                   std::ostream &stream) {
 //   double mass =
-//       output.getInventoryValue(0, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
+//       output.getInventoryValue(0,
+//       FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
 //
 //   std::pair<std::vector<int>, std::vector<double>> dom_sort =
-//       output.getSortedInventory(1, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
+//       output.getSortedInventory(1,
+//       FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
 //
 //   std::vector<int> dom_zai = std::get<0>(dom_sort);
 //   std::vector<double> dom_heat = std::get<1>(dom_sort);
@@ -615,5 +651,3 @@ void FispactProblem::convertGammaEvToCount(
 //       }
 //     }
 //     stream << std::endl;
-//   }
-// }
