@@ -10,6 +10,7 @@
 #include "MooseTypes.h"
 #include "fispactcompute.hpp"
 #include "fispactconstantsapi.h"
+#include "fispactgroupstructures.hpp"
 #include "fispactinputdata.hpp"
 #include "fispactnucleardata.hpp"
 #include "fispactoutputdata.hpp"
@@ -139,9 +140,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
   // Read neutron flux from h5 file
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
   _console << _neutron_fluxes.size() << std::endl;
-  for (auto &flux : _neutron_fluxes.at(0)) {
-    _console << flux << " " << std::endl;
-  }
 }
 
 void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {}
@@ -155,6 +153,7 @@ void FispactProblem::externalSolve() {
   for (auto element_iter : *_mesh.getActiveLocalElementRange()) {
 
     _console << "starting " + std::to_string(counter) << std::endl;
+
     // Get element id
     int elem_id = (element_iter)->id();
     _console << "Elem ID" << std::to_string(elem_id) << std::endl;
@@ -181,6 +180,10 @@ void FispactProblem::externalSolve() {
       convertGammaEvToCount(
           fispact_input, fispact_output.getGammaSpectrumBins(1),
           fispact_output.getGammaSpectrumBoundaries(0), photon_spectra);
+
+      for (auto &ev : fispact_input.getGammaEnergyBounds()) {
+        _console << std::to_string(ev) << " ";
+      }
     }
 
     _photon_fluxes.insert(
@@ -191,7 +194,7 @@ void FispactProblem::externalSolve() {
              << std::endl;
   }
 
-  writePhotonFluxToHDF5(_photon_flux_filename);
+  writePhotonFluxToHDF5(_photon_flux_filename, fispact_output);
   fp::GlobalFinalise(_fp_monitor);
   _console << "Externally Solved" << std::endl;
 }
@@ -230,7 +233,8 @@ void FispactProblem::setNuclearData(std::string nd_base_path) {
   nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
 }
 
-void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
+void FispactProblem::writePhotonFluxToHDF5(const std::string &filename,
+                                           fp::OutputData &fispact_output) {
   MPI_Comm comm = MPI_COMM_WORLD;
   MPI_Info info = MPI_INFO_NULL;
   _console << "Writing..." << std::endl;
@@ -241,7 +245,7 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
   H5Pset_fapl_mpio(plist_id, comm, info);
 
   // Create HDF5 file
-  auto testFile =
+  auto file_id =
       H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, plist_id);
   H5Pclose(plist_id);
 
@@ -255,7 +259,7 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
 
   hid_t filespace = H5Screate_simple(2, dataspace_dims, NULL);
   hid_t h5_dataset =
-      H5Dcreate(testFile, dataset_name.c_str(), H5T_NATIVE_DOUBLE, filespace,
+      H5Dcreate(file_id, dataset_name.c_str(), H5T_NATIVE_DOUBLE, filespace,
                 H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   H5Sclose(filespace);
 
@@ -294,12 +298,48 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename) {
              element_flux_pair.second.data());
     H5Sclose(memspace);
   }
-
+  writePhotonFluxBins(file_id, fispact_output);
   // Close all the HDF5 bits and pieces
   H5Sclose(filespace);
   H5Dclose(h5_dataset);
   H5Pclose(plist_id);
-  H5Fclose(testFile);
+  H5Fclose(file_id);
+}
+
+void FispactProblem::writePhotonFluxBins(hid_t file_id,
+                                         fp::OutputData &fispact_output) {
+
+  // Get gamma bins from the FISPACT output data
+  std::vector<double> photon_bins =
+      fispact_output.getGammaSpectrumBoundaries(0);
+
+  // Set up hsize_t object to hold dataset dimensions
+  hsize_t bin_dataset_dims[1];
+  bin_dataset_dims[0] = photon_bins.size();
+
+  std::string dataset_name = "photon_bins";
+
+  // Create a dataspace for the photon bins
+  hid_t filespace_photon_bins = H5Screate_simple(1, bin_dataset_dims, NULL);
+
+  // Create a dataset for the photon bins using the dataspace
+  hid_t h5_dataset_photon_bins =
+      H5Dcreate(file_id, dataset_name.c_str(), H5T_NATIVE_DOUBLE,
+                filespace_photon_bins, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Set up transfer properties
+  hid_t plist_id = H5Pcreate(H5P_DATASET_XFER);
+  H5Pset_dxpl_mpio(plist_id, H5FD_MPIO_INDEPENDENT);
+
+  // Only write the photon bins out on rank 0, we don't need to write it from
+  // all of them
+  if (ExternalProblem::comm().rank() == 0) {
+    H5Dwrite(h5_dataset_photon_bins, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL,
+             plist_id, photon_bins.data());
+  }
+  H5Sclose(filespace_photon_bins);
+  H5Dclose(h5_dataset_photon_bins);
+  H5Pclose(plist_id);
 }
 
 void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
@@ -440,7 +480,6 @@ void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
   }
 
   input.setMass(atomic_numbers, percent);
-
   setFispactSchedule(input);
 }
 

@@ -9,6 +9,7 @@
 #include "fispactnucleardata.hpp"
 #include "fispactoutputdata.hpp"
 #include "fispactutil.hpp"
+#include <hdf5/openmpi/H5Ipublic.h>
 #include <string>
 
 // Use fp as short for fispact
@@ -50,7 +51,10 @@ private:
   std::vector<double> readNeutronFluxFromHDF5(const std::string &filename);
 
   /// Write output photon flux to HDF5
-  void writePhotonFluxToHDF5(const std::string &filename);
+  void writePhotonFluxToHDF5(const std::string &filename,
+                             fp::OutputData &fispact_output);
+
+  void writePhotonFluxBins(hid_t file_id, fp::OutputData &fispact_output);
 
   void setFispactInputData(fp::FispactMonitor &monitor, fp::InputData &input,
                            MaterialDefinition &material,
@@ -135,6 +139,8 @@ private:
   std::string _neutron_bin_type;
 
   std::vector<double> _neutron_bins;
+
+  std::vector<double> _photon_bins;
 
   int _num_neutron_bins;
 
