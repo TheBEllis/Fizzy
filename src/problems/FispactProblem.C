@@ -468,9 +468,9 @@ void FispactProblem::readNeutronFluxFromHDF5(std::string filename,
     std::vector<double> neutron_flux_data(_num_neutron_bins, 0.0);
 
     // Set up counts and offsets for selecting hyperslab of tally array
-    hsize_t data_count[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
     hsize_t data_offset[3] = {static_cast<hsize_t>((_num_neutron_bins * i)), 0,
                               0};
+    hsize_t data_count[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
 
     // Set up memory space for reading tally results
     hsize_t arr_len[3] = {static_cast<hsize_t>(_num_neutron_bins), 1, 1};
