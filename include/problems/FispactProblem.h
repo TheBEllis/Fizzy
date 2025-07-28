@@ -9,8 +9,10 @@
 #include "fispactnucleardata.hpp"
 #include "fispactoutputdata.hpp"
 #include "fispactutil.hpp"
+#include "libmesh/elem.h"
 #include <hdf5/openmpi/H5Ipublic.h>
 #include <string>
+#include <unordered_map>
 
 // Use fp as short for fispact
 namespace fp = fispact;
@@ -89,6 +91,14 @@ private:
                              const std::vector<double> &photon_flux_bins,
                              std::vector<double> &photons_per_cc_per_s);
 
+  double calculateElementStrength(const libMesh::Elem *element,
+                                  const std::vector<double> element_flux);
+
+  void insertElementStrength(const libMesh::Elem *element,
+                             const std::vector<double> element_flux);
+
+  void updateLocalDomainStrength(const libMesh::Elem *element);
+
   void printInventoryByHeat(fp::OutputData &output, int timestep_index,
                             std::ostream &stream = std::cout);
 
@@ -96,6 +106,8 @@ private:
                             std::ostream &stream);
 
   void printInvData(fp::OutputData &output, std::ostream &stream);
+
+  void getTotalDomainStrength();
 
   double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
 
@@ -113,6 +125,8 @@ private:
   // FISPACT Photon fluxes
   std::unordered_map<int, std::vector<double>> _photon_fluxes;
 
+  std::unordered_map<int, double> _element_strengths;
+
   /// hdf5 filename for neutron flux
   std::string _neutron_flux_filename;
 
@@ -122,6 +136,7 @@ private:
   /// hdf5 filename for photon flux
   std::string _photon_flux_filename;
 
+  void setNeutronBins();
   ///
   bool _materials_from_xml;
 
@@ -146,5 +161,7 @@ private:
 
   std::string _schedule_uo_name;
 
-  void setNeutronBins();
+  double _local_domain_strength;
+
+  double _total_domain_strength;
 };

@@ -2,6 +2,9 @@
 #include "FispactProblem.h"
 
 #include "FispactSchedule.h"
+
+#include "PhotonSharingData.h"
+
 /// HDF5 include
 #include "H5Cpp.h"
 
@@ -16,6 +19,7 @@
 #include "fispactoutputdata.hpp"
 #include "fispactoutputdataapi.h"
 #include "fispactutil.hpp"
+#include "libmesh/elem.h"
 #include "mpi.h"
 #include "pugixml.hpp"
 #include <algorithm>
@@ -32,6 +36,7 @@
 #include <iostream>
 #include <iterator>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -105,7 +110,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _photon_flux_filename(getParam<std::string>("photon_spectra_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
-      _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")) {
+      _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")),
+      _local_domain_strength(0), _total_domain_strength(0) {
   _console << "Constructor" << std::endl;
 
   // Load materials from xml file
@@ -145,6 +151,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
 void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {}
 
 void FispactProblem::externalSolve() {
+
   // Set up fispact input data
   fp::InputData fispact_input(_fp_monitor);
   fp::OutputData fispact_output(_fp_monitor);
@@ -155,7 +162,7 @@ void FispactProblem::externalSolve() {
     _console << "starting " + std::to_string(counter) << std::endl;
 
     // Get element id
-    int elem_id = (element_iter)->id();
+    int elem_id = element_iter->id();
     _console << "Elem ID" << std::to_string(elem_id) << std::endl;
     std::vector<double> photon_spectra(24, 0);
 
@@ -164,7 +171,7 @@ void FispactProblem::externalSolve() {
 
     // If there is flux in the element, run FISPACT
     if (is_flux) {
-      // Here we are assuming the input mesh is in centremeters
+      // Here we are assuming the input mesh is in centimeters
       double element_volume = (element_iter)->volume();
 
       // Get element material definition
@@ -189,9 +196,44 @@ void FispactProblem::externalSolve() {
     _photon_fluxes.insert(
         std::pair<int, std::vector<double>>(elem_id, photon_spectra));
 
+    // Calculate photon source strength of this element and insert it into
+    // _element_strengths map
+    insertElementStrength(element_iter, _photon_fluxes.at(elem_id));
+
+    // Add calculated element strength to _local_domain_strength
+    updateLocalDomainStrength(element_iter);
+
     // Output how many elements have been checked
     _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
              << std::endl;
+  }
+
+  // Need some boost macros here to decide whether or not this path should run
+  {
+    // Use namespace alias for ease
+    namespace bi = boost::interprocess;
+
+    // Give the shared memory region a name based on current MPI rank to prevent
+    // clashes
+    std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
+
+    // Remove any shared memory region with a similar name just in case
+    bi::shared_memory_object::remove(data_name.c_str());
+
+    // Create shared memory region
+    bi::managed_shared_memory segment(bi::create_only, data_name.c_str(),
+                                      10000);
+
+    // Create a shared instantiation of the photon sharing class
+    PhotonSharingData *photon_sharing_instance =
+        segment.construct<PhotonSharingData>(
+            "PhotonSharingData photon_sharing_instance")(
+            segment, _photon_fluxes, _element_strengths, 24,
+            (int)_mesh.getMesh().n_active_local_elem(), _total_domain_strength,
+            _local_domain_strength);
+
+    // Remove shared memory region
+    bi::shared_memory_object::remove(data_name.c_str());
   }
 
   writePhotonFluxToHDF5(_photon_flux_filename, fispact_output);
@@ -603,6 +645,46 @@ void FispactProblem::convertGammaEvToCount(
 
     photons_per_cc_per_s[i] = per_cc_per_s;
   }
+}
+
+double FispactProblem::calculateElementStrength(
+    const libMesh::Elem *element, const std::vector<double> element_flux) {
+  double element_strength = 0;
+
+  for (double flux_bin : element_flux) {
+    element_strength += flux_bin * element->volume();
+  }
+
+  return element_strength;
+}
+
+void FispactProblem::insertElementStrength(
+    const libMesh::Elem *element, const std::vector<double> element_flux) {
+  double elem_strength = calculateElementStrength(element, element_flux);
+
+  _element_strengths.insert(
+      std::pair<int, double>(element->id(), elem_strength));
+}
+
+void FispactProblem::updateLocalDomainStrength(const libMesh::Elem *element) {
+  double element_strength;
+
+  // Attempt to retrieve element strength from map, otherwise catch exception
+  // and give a useful error
+  try {
+    element_strength = _element_strengths.at(element->id());
+  } catch (std::out_of_range) {
+    mooseError("Attempted to access element strength for an element ID that "
+               "has not had strength calcalculated");
+  }
+
+  _local_domain_strength += element_strength;
+}
+
+void FispactProblem::getTotalDomainStrength() {
+
+  _total_domain_strength = _local_domain_strength;
+  comm().sum(_total_domain_strength);
 }
 
 // double FispactProblem::extractHalflifeFromNuc(fp::NuclearData
