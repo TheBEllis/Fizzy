@@ -39,16 +39,18 @@ public:
   PhotonSharingData(bi::managed_shared_memory &segment,
                     std::unordered_map<int, std::vector<double>> &photon_flux,
                     std::unordered_map<int, double> &elem_strength,
-                    int num_energy_bins, int num_local_elems,
-                    double total_domain_strength, double local_domain_strength)
-      : _num_energy_bins(num_energy_bins), _num_local_elems(num_local_elems),
+                    int num_photon_bins, int num_local_elems,
+                    double total_domain_strength, double local_domain_strength,
+                    std::vector<double> local_domain_strengths,
+                    std::vector<double> photon_bins)
+      : _num_photon_bins(num_photon_bins), _num_local_elems(num_local_elems),
         _local_domain_strength(local_domain_strength),
         _total_domain_strength(total_domain_strength), _communication(true),
         _vec_alloc(segment.get_segment_manager()),
         _int_vec_map_alloc(segment.get_segment_manager()),
         _int_doub_map_alloc(segment.get_segment_manager()),
-        _photon_fluxes(_int_vec_map_alloc),
-        _elem_strength(_int_doub_map_alloc) {
+        _photon_fluxes(_int_vec_map_alloc), _elem_strength(_int_doub_map_alloc),
+        _domain_strengths(_vec_alloc), _photon_bins(_vec_alloc) {
 
     // Initialise shared memory _photon_flux map with values from
     // FispactProblem's _photon_fluxes
@@ -64,9 +66,18 @@ public:
 
       _elem_strength.insert(std::pair<int, double>(pair.first, pair.second));
     }
+
+    for (auto &strength : local_domain_strengths) {
+
+      _domain_strengths.push_back(strength);
+    }
+
+    for (auto &bin : photon_bins) {
+      _photon_bins.push_back(bin);
+    }
   }
 
-  int _num_energy_bins;
+  int _num_photon_bins;
   int _num_local_elems;
   double _local_domain_strength;
   double _total_domain_strength;
@@ -80,6 +91,8 @@ public:
 
   BoostIpIntVecMap _photon_fluxes;
   BoostIpIntDoubMap _elem_strength;
+  BoostIpVector _domain_strengths;
+  BoostIpVector _photon_bins;
 };
 
 #endif

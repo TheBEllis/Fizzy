@@ -157,7 +157,48 @@ FispactProblem::FispactProblem(const InputParameters &params)
   _console << _neutron_fluxes.size() << std::endl;
 }
 
-void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {}
+void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
+  if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
+
+#ifdef LIBMESH_HAVE_BOOST
+    {
+      // vector of all local domain strengths
+      std::vector<double> local_domain_strengths;
+      comm().allgather(_local_domain_strength, local_domain_strengths);
+
+      // calculate TotalDomainStrength
+      getTotalDomainStrength();
+
+      //
+      unsigned long shared_memory_size = calculateMemorySize();
+      // Use namespace alias for ease
+      namespace bi = boost::interprocess;
+
+      // Give the shared memory region a name based on current MPI rank to
+      // prevent clashes
+      std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
+
+      // Remove any shared memory region with a similar name just in case
+      bi::shared_memory_object::remove(data_name.c_str());
+
+      // Calculate space needed for shared mem region
+
+      // Create shared memory region
+      bi::managed_shared_memory segment(bi::create_only, data_name.c_str(),
+                                        shared_memory_size);
+
+      // Create a shared instantiation of the photon sharing class
+      PhotonSharingData *photon_sharing_instance =
+          segment.construct<PhotonSharingData>(
+              "PhotonSharingData photon_sharing_instance")(
+              segment, _photon_fluxes, _element_strengths, 24,
+              (int)_mesh.getMesh().n_active_local_elem(),
+              _total_domain_strength, _local_domain_strength,
+              local_domain_strengths, _photon_bins);
+    }
+#endif
+  }
+}
 
 void FispactProblem::externalSolve() {
 
@@ -216,33 +257,9 @@ void FispactProblem::externalSolve() {
     _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
              << std::endl;
   }
-
-  // Need some boost macros here to decide whether or not this path should run
-  {
-    // Use namespace alias for ease
-    namespace bi = boost::interprocess;
-
-    // Give the shared memory region a name based on current MPI rank to prevent
-    // clashes
-    std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
-
-    // Remove any shared memory region with a similar name just in case
-    bi::shared_memory_object::remove(data_name.c_str());
-
-    // Create shared memory region
-    bi::managed_shared_memory segment(bi::create_only, data_name.c_str(),
-                                      10000);
-
-    // Create a shared instantiation of the photon sharing class
-    PhotonSharingData *photon_sharing_instance =
-        segment.construct<PhotonSharingData>(
-            "PhotonSharingData photon_sharing_instance")(
-            segment, _photon_fluxes, _element_strengths, 24,
-            (int)_mesh.getMesh().n_active_local_elem(), _total_domain_strength,
-            _local_domain_strength);
-
-    // Remove shared memory region
-    bi::shared_memory_object::remove(data_name.c_str());
+  _photon_bins = fispact_output.getGammaSpectrumBoundaries(0);
+  for (auto bin : _photon_bins) {
+    _console << bin << " ";
   }
 
   writePhotonFluxToHDF5(_photon_flux_filename, fispact_output);
@@ -694,6 +711,24 @@ void FispactProblem::getTotalDomainStrength() {
 
   _total_domain_strength = _local_domain_strength;
   comm().sum(_total_domain_strength);
+}
+
+int FispactProblem::calculateMemorySize() {
+  // Get number of active local elements
+  int n_local_elem = _mesh.getMesh().n_active_local_elem();
+
+  unsigned long photon_flux_map_size =
+      ((24 * sizeof(double)) + sizeof(int)) * n_local_elem;
+
+  unsigned long element_strengths_map_size =
+      (sizeof(int) + sizeof(double)) * n_local_elem;
+
+  unsigned long memory_size = photon_flux_map_size +
+                              element_strengths_map_size + (sizeof(int) * 2) +
+                              (sizeof(double) * 2);
+  // Really naive way of doing this, but currently giving a 20% buffer to
+  // account for the memory space required by Boost allocators and such
+  return memory_size * 2;
 }
 
 // double FispactProblem::extractHalflifeFromNuc(fp::NuclearData

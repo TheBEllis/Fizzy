@@ -99,6 +99,8 @@ private:
 
   void updateLocalDomainStrength(const libMesh::Elem *element);
 
+  int calculateMemorySize();
+
   void printInventoryByHeat(fp::OutputData &output, int timestep_index,
                             std::ostream &stream = std::cout);
 
