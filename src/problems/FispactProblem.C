@@ -264,7 +264,6 @@ void FispactProblem::externalSolve() {
 
   writePhotonFluxToHDF5(_photon_flux_filename, fispact_output);
   fp::GlobalFinalise(_fp_monitor);
-  _console << "Externally Solved" << std::endl;
 }
 
 std::string FispactProblem::fispactLogName() {
