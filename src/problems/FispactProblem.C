@@ -1,29 +1,15 @@
 #include "ExternalProblem.h"
 #include "FispactProblem.h"
 
+// Custom user object includes
 #include "FispactSchedule.h"
 
+// Include for interprocess communication data structure
+#include "Moose.h"
 #include "PhotonSharingData.h"
 
 /// HDF5 include
 #include "H5Cpp.h"
-
-/// PugiXML include
-#include "MooseError.h"
-#include "MooseTypes.h"
-#include "fispactcompute.hpp"
-#include "fispactconstantsapi.h"
-#include "fispactgroupstructures.hpp"
-#include "fispactinputdata.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactoutputdata.hpp"
-#include "fispactoutputdataapi.h"
-#include "fispactutil.hpp"
-#include "libmesh/elem.h"
-#include "mpi.h"
-#include "pugixml.hpp"
-#include <algorithm>
-#include <filesystem>
 #include <hdf5/openmpi/H5Dpublic.h>
 #include <hdf5/openmpi/H5FDmpio.h>
 #include <hdf5/openmpi/H5Fpublic.h>
@@ -33,6 +19,29 @@
 #include <hdf5/openmpi/H5Tpublic.h>
 #include <hdf5/openmpi/H5public.h>
 #include <hdf5/openmpi/H5version.h>
+
+#include "MooseError.h"
+#include "MooseTypes.h"
+
+// Fispact includes
+#include "fispactcompute.hpp"
+#include "fispactconstantsapi.h"
+#include "fispactgroupstructures.hpp"
+#include "fispactinputdata.hpp"
+#include "fispactnucleardata.hpp"
+#include "fispactoutputdata.hpp"
+#include "fispactoutputdataapi.h"
+#include "fispactutil.hpp"
+
+#include "libmesh/elem.h"
+#include "mpi.h"
+
+/// PugiXML include
+#include "pugixml.hpp"
+
+// Cpp includes
+#include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <iterator>
 #include <ostream>
