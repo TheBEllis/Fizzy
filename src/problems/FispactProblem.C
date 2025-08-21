@@ -268,8 +268,9 @@ void FispactProblem::externalSolve() {
 }
 
 std::string FispactProblem::fispactLogName() {
-  std::string log_name =
-      "FISPACT_app_" + std::to_string(processor_id()) + ".log";
+  std::string log_name = "FISPACT_app_" +
+                         this->getMooseApp().getInputFileNames()[0] +
+                         std::to_string(processor_id()) + ".log";
   return log_name;
 }
 
