@@ -14,8 +14,15 @@
 #include <string>
 #include <unordered_map>
 
+// Include for interprocess communication data structure
+#include "PhotonSharingData.h"
+
 // Use fp as short for fispact
 namespace fp = fispact;
+
+#ifdef LIBMESH_HAVE_BOOST
+namespace bi = boost::interprocess;
+#endif
 
 class FispactProblem : public ExternalProblem {
   /// Struct to store Material definitions
@@ -115,6 +122,12 @@ private:
 
   bool isFlux(int elem_id);
 
+  // -- Interprocess bits --
+
+#ifdef LIBMESH_HAVE_BOOST
+  bi::managed_shared_memory _segment;
+#endif
+
   /// FISPACT monitor
   fp::FispactMonitor _fp_monitor;
 
@@ -166,4 +179,8 @@ private:
   double _local_domain_strength;
 
   double _total_domain_strength;
+
+  bool _write_photon_flux;
+
+  bool _comm_photon_flux;
 };

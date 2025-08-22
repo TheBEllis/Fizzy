@@ -4,10 +4,6 @@
 // Custom user object includes
 #include "FispactSchedule.h"
 
-// Include for interprocess communication data structure
-#include "Moose.h"
-#include "PhotonSharingData.h"
-
 /// HDF5 include
 #include "H5Cpp.h"
 #include <hdf5/openmpi/H5Dpublic.h>
@@ -96,18 +92,28 @@ InputParameters FispactProblem::validParams() {
       "fispact_schedule_uo", "Name of the FispactSchedule user object defining "
                              "the FISPACT flux schedule");
 
-  params.addRequiredParam<std::string>(
-      "photon_spectra_filename",
-      "Filename for the h5 file containing the output photon spectra");
-
   params.addParam<bool>(
       "read_materials_from_xml", false,
       "Parameter determining whether user wishes to read materaial nuclide "
       "compositions from openMC XML file");
+
   params.addParam<std::string>(
       "materials_xml_file", "materials.xml",
       "Path and name of material xml file user wishes to use.");
 
+  params.addParam<bool>(
+      "write_photon_flux", false,
+      "Boolean value used to determine whether to wite photon spectra to hdf5 "
+      "after Fizzy has finished running.");
+
+  params.addParam<std::string>(
+      "photon_flux_filename", "photon_flux.h5",
+      "Filename for the h5 file containing the output photon spectra");
+
+  params.addParam<bool>(
+      "comm_photon_flux", false,
+      "Boolean value used to indicate whether to use boost::interprocess to "
+      "communicate photon spectra through IPC.");
   return params;
 }
 
@@ -116,24 +122,33 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _fp_nuclear_data(_fp_monitor),
       _neutron_flux_filename(getParam<std::string>("neutron_flux_file")),
       _neutron_flux_hdf5_path(getParam<std::string>("neutron_flux_hdf5_path")),
-      _photon_flux_filename(getParam<std::string>("photon_spectra_filename")),
+      _photon_flux_filename(getParam<std::string>("photon_flux_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
       _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")),
-      _local_domain_strength(0), _total_domain_strength(0) {
-  _console << "Constructor" << std::endl;
+      _local_domain_strength(0), _total_domain_strength(0),
+      _write_photon_flux(getParam<bool>("write_photon_flux")),
+      _comm_photon_flux(getParam<bool>("comm_photon_flux")) {
 
-  // Load materials from xml file
+  // Load materials from xml file if read_materials_from_xml is set to true, and
+  // a materials xml filename has been passed
   if (_materials_from_xml) {
+    if (!isParamSetByUser("materials_xml_file")) {
+      mooseError("read_materials_from_xml is set to true, but "
+                 "materials_xml_file is not set!");
+    }
     // Set file to get materials from
     _materials_xml_file = getParam<std::string>("materials_xml_file");
     // Populate _mat_definitions with materials from openmc xml
     read_material_xml_data();
-  } else {
-    if (isParamSetByUser("materials_xml_file")) {
-      mooseError("materials_xml_file is set by user, but "
-                 "read_materials_from_xml is false!");
-    }
+  }
+
+  // If write_photon_flux was set to true then check that user input a filename,
+  // if not use default
+  if (_write_photon_flux && !isParamSetByUser("photon_flux_filename")) {
+    _console << "write_photon_flux is set to true but photon_flux_filename is "
+                "not set! Photon flux filename defaulting to " +
+                    _photon_flux_filename;
   }
 
   // Check a corresponding material exists for all mesh blocks
@@ -151,17 +166,41 @@ FispactProblem::FispactProblem(const InputParameters &params)
 
   // Set neutron bin type
   setNeutronBins();
-
   // Read neutron flux from h5 file
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
-  _console << _neutron_fluxes.size() << std::endl;
+
+  if (_comm_photon_flux) {
+#ifdef LIBMESH_HAVE_BOOST
+    // Give the shared memory region a name based on current MPI rank to
+    // prevent clashes
+    std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
+
+    // Remove any shared memory region with a similar name just in case
+    bi::shared_memory_object::remove(data_name.c_str());
+
+    // Calculate space needed for shared mem region
+    unsigned long shared_memory_size = calculateMemorySize();
+
+    // Create shared memory region
+    _segment = bi::managed_shared_memory(bi::create_only, data_name.c_str(),
+                                         shared_memory_size);
+#else
+    mooseError("_comm_photon_flux is set to true but libmesh was not built "
+               "with BOOST. No communication occuring.");
+#endif
+  }
 }
 
 void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
   if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
 
+    if (_comm_photon_flux) {
 #ifdef LIBMESH_HAVE_BOOST
-    {
+
+      unsigned long shared_memory_size = calculateMemorySize();
+
+      std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
+
       // vector of all local domain strengths
       std::vector<double> local_domain_strengths;
       comm().allgather(_local_domain_strength, local_domain_strengths);
@@ -169,34 +208,19 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
       // calculate TotalDomainStrength
       getTotalDomainStrength();
 
-      //
-      unsigned long shared_memory_size = calculateMemorySize();
-      // Use namespace alias for ease
-      namespace bi = boost::interprocess;
-
-      // Give the shared memory region a name based on current MPI rank to
-      // prevent clashes
-      std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
-
-      // Remove any shared memory region with a similar name just in case
-      bi::shared_memory_object::remove(data_name.c_str());
-
-      // Calculate space needed for shared mem region
-
-      // Create shared memory region
-      bi::managed_shared_memory segment(bi::create_only, data_name.c_str(),
-                                        shared_memory_size);
-
       // Create a shared instantiation of the photon sharing class
       PhotonSharingData *photon_sharing_instance =
-          segment.construct<PhotonSharingData>(
+          _segment.construct<PhotonSharingData>(
               "PhotonSharingData photon_sharing_instance")(
-              segment, _photon_fluxes, _element_strengths, 24,
+              _segment, _photon_fluxes, _element_strengths, 24,
               (int)_mesh.getMesh().n_active_local_elem(),
               _total_domain_strength, _local_domain_strength,
               local_domain_strengths, _photon_bins);
-    }
+#else
+      mooseError("_comm_photon_flux is set to true but libmesh was not built "
+                 "with BOOST. No communication occuring.");
 #endif
+    }
   }
 }
 
@@ -257,9 +281,15 @@ void FispactProblem::externalSolve() {
     _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
              << std::endl;
   }
+
   _photon_bins = fispact_output.getGammaSpectrumBoundaries(0);
-  for (auto bin : _photon_bins) {
-    _console << bin << " ";
+
+  for (auto &bin : _photon_bins) {
+    if (bin < 0.01) {
+      continue;
+    }
+    // Change bins to MeV;
+    bin *= 1e6;
   }
 
   writePhotonFluxToHDF5(_photon_flux_filename, fispact_output);
@@ -351,7 +381,8 @@ void FispactProblem::writePhotonFluxToHDF5(const std::string &filename,
     // selection should be the element_id who's flux we wish to write
     hsize_t offset[2] = {element_id, 0};
 
-    // count specifies the number of entries we wish to write in each dimension
+    // count specifies the number of entries we wish to write in each
+    // dimension
     hsize_t count[2] = {1, 24};
 
     // Select the hyperslab of the dataspace that we wish to write to
