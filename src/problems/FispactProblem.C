@@ -168,7 +168,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
   setNeutronBins();
   // Read neutron flux from h5 file
   readNeutronFluxFromHDF5(_neutron_flux_filename, _neutron_flux_hdf5_path);
-
   if (_comm_photon_flux) {
 #ifdef LIBMESH_HAVE_BOOST
     // Give the shared memory region a name based on current MPI rank to
@@ -621,7 +620,6 @@ void FispactProblem::read_material_xml_data() {
   pugi::xml_parse_result result = doc.load_file(_materials_xml_file.c_str());
 
   if (!result) {
-    // mooseError();
     mooseError("No file called " + _materials_xml_file +
                " could be found, exiting.");
   }
@@ -761,89 +759,3 @@ int FispactProblem::calculateMemorySize() {
   // account for the memory space required by Boost allocators and such
   return memory_size * 2;
 }
-
-// double FispactProblem::extractHalflifeFromNuc(fp::NuclearData
-// &nuclear_data,
-//                                               int zai) {
-//   int num_zais = nuclear_data.getDecayDataSize();
-//
-//   std::vector<int> decay_zais = nuclear_data.getDecayZais();
-//   for (int i = 0; i < num_zais + 1; i++) {
-//     if (decay_zais[i] == zai) {
-//       double halflife = nuclear_data.getDecayHalfLife(i);
-//       return halflife;
-//     }
-//   }
-//   return -1.0;
-// }
-//
-// void FispactProblem::printInventoryByHeat(fp::OutputData &output,
-//                                           int timestep_index,
-//                                           std::ostream &stream) {
-//   double mass = output.getInventoryValue(
-//       timestep_index, FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
-//
-//   std::pair<std::vector<int>, std::vector<double>> dom_sort =
-//       output.getSortedInventory(timestep_index,
-//                                 FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-//
-//   std::vector<int> dom_zai = std::get<0>(dom_sort);
-//   std::vector<double> dom_heat = std::get<1>(dom_sort);
-//
-//   int num_nuclides = dom_zai.size();
-//   for (int i = (num_nuclides - 8); i < num_nuclides; i++) {
-//     double heating = dom_heat[i] / mass;
-//     double halflife = extractHalflifeFromNuc(_fp_nuclear_data, dom_zai[i]);
-//     if (halflife != -1.0) {
-//       std::string nuclide_name =
-//           fp::util::GetNuclideName(_fp_monitor, dom_zai[i]);
-//
-//       // stream << std::setw(15) << halflife / FISPACT_YEAR_TO_SEC <<
-//       // std::setw(15)
-//       //        << heating << std::setw(15) << nuclide_name << "\n";
-//       stream << heating << "," << nuclide_name << "\n";
-//     }
-//   }
-// }
-//
-// void FispactProblem::printInvData(fp::OutputData &output,
-//                                   std::ostream &stream) {
-//   double mass =
-//       output.getInventoryValue(0,
-//       FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS);
-//
-//   std::pair<std::vector<int>, std::vector<double>> dom_sort =
-//       output.getSortedInventory(1,
-//       FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-//
-//   std::vector<int> dom_zai = std::get<0>(dom_sort);
-//   std::vector<double> dom_heat = std::get<1>(dom_sort);
-//
-//   std::vector<int> chosen_zai(dom_zai.end() - 8, dom_zai.end());
-//
-//   for (auto zai : chosen_zai) {
-//     std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor, zai);
-//     stream << nuclide_name << ",";
-//   }
-//
-//   stream << std::endl;
-//
-//   for (int time = 1; time < 6; time++) {
-//
-//     std::pair<std::vector<int>, std::vector<double>> timestep_sort =
-//         output.getSortedInventory(time,
-//                                   FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT);
-//     std::vector<int> time_zai = std::get<0>(timestep_sort);
-//     std::vector<double> time_heat = std::get<1>(timestep_sort);
-//
-//     for (int j = 0; j < time_zai.size(); j++) {
-//       int zai = time_zai[j];
-//       if (std::find(chosen_zai.begin(), chosen_zai.end(), zai) !=
-//           chosen_zai.end()) {
-//         std::string nuclide_name = fp::util::GetNuclideName(_fp_monitor,
-//         zai); double heating = time_heat[j] / mass;
-//         // std::cout << heating << std::endl;
-//         stream << heating << ",";
-//       }
-//     }
-//     stream << std::endl;
