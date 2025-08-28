@@ -20,9 +20,9 @@
   neutron_flux_file = '/home/bill/Projects/PyFIS/cube_example/neutron_cube/statepoint.2.h5'
   neutron_flux_hdf5_path = 'tallies/tally 1/results'
   neutron_bin_type = 'G1102'
-  write_photon_spectra = True
-  photon_spectra_filename = 'photon_spectra_out'
-  comm_photon_spectra = True
+  write_photon_flux = True
+  photon_flux_filename = 'photon_spectra_out'
+  comm_photon_flux = True
 
   fispact_schedule_uo = 'Schedule'
 
