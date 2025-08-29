@@ -1,0 +1,292 @@
+#include "HDF5Utils.h"
+#include "MooseError.h"
+#include "fmt/format.h"
+#include "mpi.h"
+#include <hdf5/openmpi/H5Ipublic.h>
+#include <string>
+
+namespace hdf5_utils {
+
+bool attribute_exists(hid_t obj_id, const char *name) {
+
+  htri_t out = H5Aexists_by_name(obj_id, ".", name, H5P_DEFAULT);
+  // If the attribute exists out will be 1
+  return out > 0;
+}
+
+bool object_exists(hid_t object_id, const char *name) {
+  htri_t out = H5LTpath_valid(object_id, name, true);
+  if (out < 0) {
+    std::string error =
+        "Failed to check if object " + std::string(name) + " exists.";
+    mooseError(error);
+  }
+  return (out > 0);
+}
+
+void get_shape(hid_t obj_id, hsize_t *dims) {
+
+  auto type = H5Iget_type(obj_id);
+  hid_t dspace;
+  if (type == H5I_DATASET) {
+    dspace = H5Dget_space(obj_id);
+  } else if (type == H5I_ATTR) {
+    dspace = H5Aget_space(obj_id);
+  } else {
+    throw std::runtime_error{
+        "Expected dataset or attribute in call to get_shape."};
+  }
+  H5Sget_simple_extent_dims(dspace, dims, nullptr);
+  H5Sclose(dspace);
+}
+
+std::string object_name(hid_t obj_id) {
+  // Determine size and create buffer
+  size_t size = 1 + H5Iget_name(obj_id, nullptr, 0);
+  char *buffer = new char[size];
+
+  // Read and return name
+  H5Iget_name(obj_id, buffer, size);
+  std::string str = buffer;
+  delete[] buffer;
+  return str;
+}
+
+void ensure_exists(hid_t obj_id, const char *name, bool attribute) {
+  if (attribute) {
+    if (!attribute_exists(obj_id, name)) {
+      mooseError(fmt::format("Attribute \"{}\" does not exist in object {}",
+                             name, object_name(obj_id)));
+    }
+  } else {
+    if (!object_exists(obj_id, name)) {
+      mooseError(fmt::format("Object \"{}\" does not exist in object {}", name,
+                             object_name(obj_id)));
+    }
+  }
+}
+
+hid_t file_open(const char *filename, char mode, bool parallel,
+                const MPI_Comm &comm) {
+  bool create;
+  unsigned int flags;
+  switch (mode) {
+  case 'r':
+  case 'a':
+    create = false;
+    flags = (mode == 'r' ? H5F_ACC_RDONLY : H5F_ACC_RDWR);
+    break;
+  case 'w':
+  case 'x':
+    create = true;
+    flags = (mode == 'x' ? H5F_ACC_EXCL : H5F_ACC_TRUNC);
+    break;
+  default:
+    mooseError(fmt::format("Invalid file mode: ", mode));
+  }
+
+  hid_t plist = H5P_DEFAULT;
+#ifdef H5_HAVE_PARALLEL
+  if (parallel) {
+    // Setup file access property list with parallel I/O access
+    plist = H5Pcreate(H5P_FILE_ACCESS);
+
+    H5Pset_fapl_mpio(plist, comm, MPI_INFO_NULL);
+  }
+#endif
+
+  // Open the file collectively
+  hid_t file_id;
+  if (create) {
+    file_id = H5Fcreate(filename, flags, H5P_DEFAULT, plist);
+  } else {
+    file_id = H5Fopen(filename, flags, plist);
+  }
+  if (file_id < 0) {
+    mooseError(fmt::format("Failed to open HDF5 file with mode '{}': {}", mode,
+                           filename));
+  }
+
+#ifdef H5_HAVE_PARALLEL
+  // Close the property list
+  if (parallel)
+    H5Pclose(plist);
+#endif
+
+  return file_id;
+}
+
+void file_close(hid_t file_id) { H5Fclose(file_id); }
+
+hid_t open_group(hid_t group_id, const char *name) {
+  ensure_exists(group_id, name);
+  return H5Gopen(group_id, name, H5P_DEFAULT);
+}
+
+hid_t open_group(hid_t group_id, const std::string &name) {
+  return open_group(group_id, name.c_str());
+}
+
+void close_group(hid_t group_id) {
+  if (H5Gclose(group_id) < 0)
+    mooseError("Failed to close group");
+}
+
+hid_t open_dataset(hid_t group_id, const char *name) {
+  ensure_exists(group_id, name);
+  return H5Dopen(group_id, name, H5P_DEFAULT);
+}
+
+void close_dataset(hid_t dataset_id) {
+  if (H5Dclose(dataset_id) < 0)
+    mooseError("Failed to close dataset");
+}
+
+bool using_mpio_device(hid_t obj_id) {
+
+  // Determine file that this object is part of
+  hid_t file_id = H5Iget_file_id(obj_id);
+
+  // Get file access property list
+  hid_t fapl_id = H5Fget_access_plist(file_id);
+
+  // Get low-level driver identifier
+  hid_t driver = H5Pget_driver(fapl_id);
+
+  // Free resources
+  H5Pclose(fapl_id);
+  H5Fclose(file_id);
+
+  return driver == H5FD_MPIO;
+}
+
+void write_dataset_lowlevel(hid_t obj_id, const char *name, int ndim,
+                            const hsize_t *dims, hid_t mem_type_id,
+                            void *buffer, bool parallel, bool indep,
+                            hid_t file_space_id) {
+
+  hid_t dataset = obj_id;
+  if (name) {
+    dataset = open_dataset(obj_id, name);
+  }
+  // If array is given, create a simple dataspace. Otherwise, create a
+  // scalar datascape.
+  hid_t mem_space = H5Screate_simple(ndim, dims, NULL);
+
+  if (parallel) {
+#ifdef H5_HAVE_PARALLEL
+    // Set up collective vs independent I/O
+    auto data_xfer_mode = indep ? H5FD_MPIO_INDEPENDENT : H5FD_MPIO_COLLECTIVE;
+
+    // Create dataset transfer property list
+    hid_t plist = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist, data_xfer_mode);
+
+    // Write data
+    H5Dwrite(dataset, mem_type_id, mem_space, file_space_id, plist, buffer);
+    H5Pclose(plist);
+#endif
+  } else {
+    H5Dwrite(dataset, mem_type_id, mem_space, file_space_id, H5P_DEFAULT,
+             buffer);
+  }
+
+  // Free resources
+  H5Sclose(mem_space);
+  if (name) {
+    H5Dclose(dataset);
+  }
+}
+
+void read_dataset_lowlevel(hid_t obj_id, const char *name, hid_t mem_type_id,
+                           hid_t mem_space_id, void *buffer, bool parallel,
+                           bool indep, hid_t file_space_id) {
+
+  hid_t dataset = obj_id;
+  if (name) {
+    dataset = open_dataset(obj_id, name);
+  }
+
+  if (parallel) {
+#ifdef H5_HAVE_PARALLEL
+    // Set up collective vs independent I/O
+    auto data_xfer_mode = indep ? H5FD_MPIO_INDEPENDENT : H5FD_MPIO_COLLECTIVE;
+
+    // Create dataset transfer property list
+    hid_t plist = H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist, data_xfer_mode);
+
+    // Read data
+    H5Dread(dataset, mem_type_id, mem_space_id, file_space_id, plist, buffer);
+    H5Pclose(plist);
+#endif
+  } else {
+    H5Dread(dataset, mem_type_id, mem_space_id, file_space_id, H5P_DEFAULT,
+            buffer);
+  }
+
+  if (name) {
+    H5Dclose(dataset);
+  }
+}
+
+void read_double(hid_t obj_id, const char *name, double *buffer, bool parallel,
+                 bool indep) {
+  read_dataset_lowlevel(obj_id, name, H5T_NATIVE_DOUBLE, H5S_ALL, buffer,
+                        parallel, indep);
+}
+
+void read_int(hid_t obj_id, const char *name, int *buffer, bool parallel,
+              bool indep) {
+  read_dataset_lowlevel(obj_id, name, H5T_NATIVE_INT, H5S_ALL, buffer, parallel,
+                        indep);
+}
+
+void read_double_hyperslab(hid_t obj_id, const char *name, hsize_t ndim,
+                           hsize_t dims[], hsize_t start[], hsize_t count[],
+                           double *results, bool parallel, bool indep) {
+  hid_t dataset = obj_id;
+  if (name) {
+    dataset = open_dataset(obj_id, name);
+  }
+  hid_t mem_space_id = H5Screate_simple(ndim, dims, nullptr);
+
+  hid_t file_space_id = H5Dget_space(dataset);
+
+  H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, start, nullptr, count,
+                      nullptr);
+
+  read_dataset_lowlevel(obj_id, name, H5T_NATIVE_DOUBLE, mem_space_id, results,
+                        parallel, indep, file_space_id);
+
+  H5Sclose(mem_space_id);
+  H5Sclose(file_space_id);
+
+  if (name) {
+    H5Dclose(dataset);
+  }
+}
+
+void write_double_hyperslab(hid_t obj_id, const char *name, hsize_t ndim,
+                            hsize_t dims[], hsize_t start[], hsize_t count[],
+                            double *results, bool parallel, bool indep) {
+
+  hid_t dataset = obj_id;
+  if (name) {
+    dataset = open_dataset(obj_id, name);
+  }
+  hid_t file_space_id = H5Dget_space(dataset);
+
+  H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, start, nullptr, count,
+                      nullptr);
+
+  write_dataset_lowlevel(obj_id, name, ndim, dims, H5T_NATIVE_DOUBLE, results,
+                         parallel, indep, file_space_id);
+
+  H5Sclose(file_space_id);
+  if (name) {
+    H5Dclose(dataset);
+  }
+}
+
+} // namespace hdf5_utils

@@ -18,7 +18,7 @@
   fispact_nuclear_data_path = '/home/bill/Projects/FISPACT/nuclear_data/'
 
   neutron_flux_file = '/home/bill/Projects/PyFIS/cube_example/neutron_cube/statepoint.2.h5'
-  neutron_flux_hdf5_path = 'tallies/tally 1/results'
+  neutron_flux_tally_id = 1
   neutron_bin_type = 'G1102'
   write_photon_flux = True
   photon_flux_filename = 'photon_spectra_out'

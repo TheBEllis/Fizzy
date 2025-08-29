@@ -10,12 +10,14 @@
 #include "fispactoutputdata.hpp"
 #include "fispactutil.hpp"
 #include "libmesh/elem.h"
-#include <hdf5/openmpi/H5Ipublic.h>
+
+#include "HDF5Utils.h"
 #include <string>
 #include <unordered_map>
 
 // Include for interprocess communication data structure
 #include "PhotonSharingData.h"
+#include "libmesh/id_types.h"
 
 // Use fp as short for fispact
 namespace fp = fispact;
@@ -57,13 +59,15 @@ private:
   void setNuclearData(std::string nd_base_path);
 
   /// Read a neutron flux spectra from a hdf5 file
-  std::vector<double> readNeutronFluxFromHDF5(const std::string &filename);
+  std::vector<double> readElementNeutronFlux(const std::string &filename,
+                                             const dof_id_type &elem_id,
+                                             const int &tally_id,
+                                             const int &num_neutron_bins);
 
-  /// Write output photon flux to HDF5
-  void writePhotonFluxToHDF5(const std::string &filename,
-                             fp::OutputData &fispact_output);
+  void writePhotonFlux(const std::string &filename);
 
-  void writePhotonFluxBins(hid_t file_id, fp::OutputData &fispact_output);
+  void writePhotonFluxBins(hid_t file_id, std::vector<double> &photon_bins,
+                           bool parallel);
 
   void setFispactInputData(fp::FispactMonitor &monitor, fp::InputData &input,
                            MaterialDefinition &material,
@@ -75,8 +79,6 @@ private:
 
   // Initialise FISPACT monitor object
   void initFispactMonitor(std::string);
-
-  void readNeutronFluxFromHDF5(std::string filename, std::string tally_dir);
 
   void read_material_xml_data();
 
@@ -120,7 +122,12 @@ private:
 
   double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
 
-  bool isFlux(int elem_id);
+  bool isFlux(std::vector<double> &flux);
+
+  void setNeutronBins();
+  ///
+  void getPhotonBins(std::vector<double> &photon_bins,
+                     fp::OutputData &fispact_output);
 
   // -- Interprocess bits --
 
@@ -146,13 +153,11 @@ private:
   std::string _neutron_flux_filename;
 
   /// path to neutron flux array in hdf5 file
-  std::string _neutron_flux_hdf5_path;
+  int _neutron_flux_tally_id;
 
   /// hdf5 filename for photon flux
   std::string _photon_flux_filename;
 
-  void setNeutronBins();
-  ///
   bool _materials_from_xml;
 
   /// Boolean to determine whether a rank is still running FISPACT calculations
@@ -164,7 +169,7 @@ private:
   /// Mappings from material name to material definitions
   std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
 
-  MaterialDefinition &getElementMaterial(int &elem_id);
+  MaterialDefinition &getElementMaterial(dof_id_type &elem_id);
 
   std::string _neutron_bin_type;
 
