@@ -272,6 +272,9 @@ private:
   ///
   std::unordered_map<int, double> _element_strengths;
 
+  /// Fispact nuclear data path
+  std::string _fp_nuclear_data_path;
+
   /// hdf5 filename for neutron flux
   std::string _neutron_flux_filename;
 

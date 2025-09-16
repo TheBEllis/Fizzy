@@ -107,8 +107,8 @@ InputParameters FispactProblem::validParams() {
 FispactProblem::FispactProblem(const InputParameters &params)
     : ExternalProblem(params), _fp_monitor(fispactLogName()),
       _fp_nuclear_data(_fp_monitor),
-      _neutron_flux_filename(getParam<FileName>("neutron_flux_file")),
       _fp_nuclear_data_path(getParam<FileName>("fispact_nuclear_data_path")),
+      _neutron_flux_filename(getParam<FileName>("neutron_flux_file")),
       _neutron_flux_tally_id(getParam<int>("neutron_flux_tally_id")),
       _photon_flux_filename(getParam<FileName>("photon_flux_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
