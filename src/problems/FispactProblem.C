@@ -34,6 +34,8 @@
 #include <utility>
 #include <vector>
 
+#include <mpi.h>
+
 registerMooseObject("FizzyApp", FispactProblem);
 
 InputParameters FispactProblem::validParams() {
@@ -61,17 +63,14 @@ InputParameters FispactProblem::validParams() {
   params.suppressParameter<std::vector<LinearSystemName>>("linear_sys_names");
 
   /// New parameters we need for FISPACT
-  params.addRequiredParam<std::string>("neutron_flux_file",
-                                       "HDF5 file storing neutron flux");
+  params.addRequiredParam<FileName>("neutron_flux_file",
+                                    "HDF5 file storing neutron flux");
   params.addRequiredParam<int>(
       "neutron_flux_tally_id",
       "Path within HDF5 file for the vector storing neutron flux");
 
-  params.addRequiredParam<std::string>("fispact_nuclear_data_path",
-                                       "Path to FISPACT nuclear data");
-
-  params.addRequiredParam<std::string>("fispact_nuclear_data_path",
-                                       "Path to FISPACT nuclear data");
+  params.addRequiredParam<FileName>("fispact_nuclear_data_path",
+                                    "Path to FISPACT nuclear data");
 
   params.addRequiredParam<std::string>("neutron_bin_type",
                                        "neutron binning scheme for FISPACT");
@@ -85,7 +84,7 @@ InputParameters FispactProblem::validParams() {
       "Parameter determining whether user wishes to read materaial nuclide "
       "compositions from openMC XML file");
 
-  params.addParam<std::string>(
+  params.addParam<FileName>(
       "materials_xml_file", "materials.xml",
       "Path and name of material xml file user wishes to use.");
 
@@ -94,7 +93,7 @@ InputParameters FispactProblem::validParams() {
       "Boolean value used to determine whether to wite photon spectra to hdf5 "
       "after Fizzy has finished running.");
 
-  params.addParam<std::string>(
+  params.addParam<FileName>(
       "photon_flux_filename", "photon_flux.h5",
       "Filename for the h5 file containing the output photon spectra");
 
@@ -108,15 +107,18 @@ InputParameters FispactProblem::validParams() {
 FispactProblem::FispactProblem(const InputParameters &params)
     : ExternalProblem(params), _fp_monitor(fispactLogName()),
       _fp_nuclear_data(_fp_monitor),
-      _neutron_flux_filename(getParam<std::string>("neutron_flux_file")),
+      _neutron_flux_filename(getParam<FileName>("neutron_flux_file")),
+      _fp_nuclear_data_path(getParam<FileName>("fispact_nuclear_data_path")),
       _neutron_flux_tally_id(getParam<int>("neutron_flux_tally_id")),
-      _photon_flux_filename(getParam<std::string>("photon_flux_filename")),
+      _photon_flux_filename(getParam<FileName>("photon_flux_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
+      _materials_xml_file(getParam<FileName>("materials_xml_file")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
       _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")),
       _local_domain_strength(0), _total_domain_strength(0),
       _write_photon_flux(getParam<bool>("write_photon_flux")),
-      _comm_photon_flux(getParam<bool>("comm_photon_flux")) {
+      _comm_photon_flux(getParam<bool>("comm_photon_flux")),
+      _interprocess_segment_name(generateInterprocessName()) {
 
   /**
    * Load materials from xml file if read_materials_from_xml is set to true,
@@ -124,11 +126,10 @@ FispactProblem::FispactProblem(const InputParameters &params)
    */
   if (_materials_from_xml) {
     if (!isParamSetByUser("materials_xml_file")) {
-      mooseError("read_materials_from_xml is set to true, but "
-                 "materials_xml_file is not set!");
+      mooseWarning("read_materials_from_xml is set to true, but "
+                   "materials_xml_file is not set! Defaulting to " +
+                   _materials_xml_file);
     }
-    /// Set file to get materials from
-    _materials_xml_file = getParam<std::string>("materials_xml_file");
     /// Populate _mat_definitions with materials from openmc xml
     read_material_xml_data();
   }
@@ -152,32 +153,23 @@ FispactProblem::FispactProblem(const InputParameters &params)
   /// Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
 
-  /// Get the path to our nuclear data
-  std::string fp_nuclear_data_path =
-      getParam<std::string>("fispact_nuclear_data_path");
-
   /// Set nuclear data paths
-  setNuclearData(fp_nuclear_data_path);
+  setNuclearData(_fp_nuclear_data_path);
 
   /// Read neutron flux from h5 file
   if (_comm_photon_flux) {
 
 #ifdef LIBMESH_HAVE_BOOST
 
-    /**
-     * Give the shared memory region a name based on current MPI rank to
-     * prevent clashes
-     */
-    std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
-
     /// Remove any shared memory region with a similar name just in case
-    bi::shared_memory_object::remove(data_name.c_str());
+    bi::shared_memory_object::remove(_interprocess_segment_name.c_str());
 
     /// Calculate space needed for shared mem region
     unsigned long shared_memory_size = calculateMemorySize();
 
     /// Create shared memory region
-    _segment = bi::managed_shared_memory(bi::create_only, data_name.c_str(),
+    _segment = bi::managed_shared_memory(bi::create_only,
+                                         _interprocess_segment_name.c_str(),
                                          shared_memory_size);
 #else
     mooseError("_comm_photon_flux is set to true but libmesh was not built "
@@ -191,10 +183,6 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
 
     if (_comm_photon_flux) {
 #ifdef LIBMESH_HAVE_BOOST
-
-      unsigned long shared_memory_size = calculateMemorySize();
-
-      std::string data_name = "SHARING_DATA_" + std::to_string(comm().rank());
 
       /// vector of all local domain strengths
       std::vector<double> local_domain_strengths;
@@ -233,9 +221,8 @@ void FispactProblem::externalSolve() {
 
     _console << "Elem ID: " << std::to_string(elem_id) << std::endl;
 
-    std::vector<double> neutron_flux =
-        readElementNeutronFlux(_neutron_flux_filename, elem_id,
-                               _neutron_flux_tally_id, _num_neutron_bins);
+    std::vector<double> neutron_flux = readElementNeutronFlux(
+        _neutron_flux_filename, elem_id, _neutron_flux_tally_id);
 
     /// Output how many elements have been checked
     _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
@@ -254,15 +241,21 @@ void FispactProblem::externalSolve() {
       /// Get element material definition
       MaterialDefinition &el_mat = getElementMaterial(elem_id);
 
-      setFispactInputData(_fp_monitor, el_mat, neutron_flux, _neutron_bins,
-                          element_volume, fispact_input);
+      setFispactInputData(_fp_monitor, el_mat, neutron_flux, element_volume,
+                          fispact_input);
       /// Run FISPACT
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
                   process_callback);
 
-      convertGammaEvToCount(
-          fispact_input, fispact_output.getGammaSpectrumBins(1),
-          fispact_output.getGammaSpectrumBoundaries(0), photon_spectra);
+      /// If photon bins aren't set yet, set them
+      if (_photon_bins.empty()) {
+
+        setPhotonBins(fispact_output);
+      }
+
+      convertGammaEvToCount(fispact_input,
+                            fispact_output.getGammaSpectrumBins(1),
+                            photon_spectra);
     }
 
     _photon_fluxes.insert(
@@ -277,7 +270,6 @@ void FispactProblem::externalSolve() {
     updateLocalDomainStrength(element);
   }
 
-  getPhotonBins(_photon_bins, fispact_output);
   writePhotonFlux(_photon_flux_filename);
   fp::GlobalFinalise(_fp_monitor);
 }
@@ -343,14 +335,15 @@ void FispactProblem::writePhotonFlux(const std::string &filename) {
   H5Dclose(h5_dataset);
 
   /// Write bins to hdf5 file as well
-  writePhotonFluxBins(file_id, _photon_bins, parallel);
+  writePhotonFluxBins(file_id, parallel);
 
   H5Fclose(file_id);
 }
 
-void FispactProblem::writePhotonFluxBins(hid_t file_id,
-                                         std::vector<double> &photon_bins,
-                                         bool parallel) {
+void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
+                                         const bool parallel) {
+  /// Check _photon_bins are actually set
+  std::vector<double> &photon_bins = getPhotonBins();
 
   /// Set up hsize_t object to hold dataset dimensions
   int ndim = 1;
@@ -373,12 +366,11 @@ void FispactProblem::writePhotonFluxBins(hid_t file_id,
                                      photon_bins.data(), parallel);
 }
 
-void FispactProblem::getPhotonBins(std::vector<double> &photon_bins,
-                                   fp::OutputData &fispact_output) {
+void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
 
-  photon_bins = fispact_output.getGammaSpectrumBoundaries(0);
+  _photon_bins = fispact_output.getGammaSpectrumBoundaries(0);
 
-  for (auto &bin : photon_bins) {
+  for (auto &bin : _photon_bins) {
     if (bin < 0.01) {
       continue;
     }
@@ -387,9 +379,10 @@ void FispactProblem::getPhotonBins(std::vector<double> &photon_bins,
   }
 }
 
-std::vector<double> FispactProblem::readElementNeutronFlux(
-    const std::string &filename, const dof_id_type &elem_id,
-    const int &tally_id, const int &num_neutron_bins) {
+std::vector<double>
+FispactProblem::readElementNeutronFlux(const std::string &filename,
+                                       const dof_id_type &elem_id,
+                                       const int &tally_id) const {
   /**
    * Don't do this with HDF5 MPI driver, as we are going to call H5Dopen a
    * different number of times on each rank!
@@ -408,9 +401,9 @@ std::vector<double> FispactProblem::readElementNeutronFlux(
       hdf5_utils::open_group(tallies_group_id, tally_group_name);
 
   /// Define size of selection of neutron flux
-  hsize_t dims[3]{static_cast<hsize_t>(num_neutron_bins), 1, 1};
-  hsize_t start[]{elem_id * num_neutron_bins, 0, 0};
-  hsize_t count[]{static_cast<hsize_t>(num_neutron_bins), 1, 1};
+  hsize_t dims[3]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
+  hsize_t start[]{elem_id * _num_neutron_bins, 0, 0};
+  hsize_t count[]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
 
   /// Get number of tally realizations
   int n_realizations;
@@ -445,13 +438,13 @@ std::vector<double> FispactProblem::readElementNeutronFlux(
  * TODO: Break up this function into setFispactInputFlux and
  * setFispactInputMaterial
  */
-void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
-                                         MaterialDefinition &material,
-                                         std::vector<double> &neutron_flux,
-                                         const std::vector<double> &bins,
-                                         double volume, fp::InputData &input) {
+void FispactProblem::setFispactInputData(
+    const fp::FispactMonitor &monitor, const MaterialDefinition &material,
+    const std::vector<double> &neutron_flux, const double &volume,
+    fp::InputData &input) const {
+
   /// Set neutron flux
-  input.setFlux(bins, neutron_flux);
+  input.setFlux(_neutron_bins, neutron_flux);
 
   input.setFluxWallLoading(1.0);
 
@@ -486,7 +479,8 @@ void FispactProblem::setFispactInputData(fp::FispactMonitor &monitor,
   setFispactSchedule(input);
 }
 
-void FispactProblem::setFispactSchedule(fp::InputData &input) {
+void FispactProblem::setFispactSchedule(fp::InputData &input) const {
+
   FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
   const std::vector<double> &flux_schedule = schedule.getFluxSchedule();
@@ -502,15 +496,14 @@ FispactProblem::getElementMaterial(dof_id_type &elem_id) {
       _mesh.getSubdomainName(elem->subdomain_id());
 
   /// Return material definition if it exists, otherwise throw error
-  if (_mat_definitions.find(subdomain_name) != _mat_definitions.end()) {
-    return _mat_definitions.at(subdomain_name);
-
-  } else {
+  if (_mat_definitions.find(subdomain_name) == _mat_definitions.end()) {
     mooseError("No FISPACT material named " + subdomain_name + " was found.");
   }
+
+  return _mat_definitions.at(subdomain_name);
 }
 
-bool FispactProblem::isFlux(std::vector<double> &flux) {
+bool FispactProblem::isFlux(const std::vector<double> &flux) const {
   /// Check if there is any neutron flux in current element
   bool is_zero_flux =
       std::all_of(flux.begin(), flux.end(), [](double j) { return j == 0; });
@@ -560,9 +553,10 @@ void FispactProblem::setNeutronBins() {
     _neutron_bins = fp::groups::G1102();
     _num_neutron_bins = 1102;
   }
+  /// TODO: Add more bins types
 }
 
-void FispactProblem::checkMaterialsExist() {
+void FispactProblem::checkMaterialsExist() const {
 
   /// Fetch all subdomain ID's from libmesh
   std::vector<unsigned short> subdomain_ids;
@@ -584,8 +578,7 @@ void FispactProblem::checkMaterialsExist() {
 }
 
 void FispactProblem::convertGammaEvToCount(
-    fp::InputData &input, const std::vector<double> &photon_spectra,
-    const std::vector<double> &photon_flux_bins,
+    const fp::InputData &input, const std::vector<double> &photon_spectra,
     std::vector<double> &photons_per_cc_per_s) {
 
   /// Reserve memory for photons per cc per s vector
@@ -595,6 +588,7 @@ void FispactProblem::convertGammaEvToCount(
   double inv_density = input.getDensity();
   double inv_mass = input.getMassTotal();
 
+  const std::vector<double> &photon_flux_bins = getPhotonBins();
   /// Convert from MeV/s to per cc per s for each bin
   for (int i = 0; i < photon_spectra.size(); i++) {
     double bin_energy = photon_flux_bins[i] +
@@ -680,7 +674,7 @@ std::string FispactProblem::fispactLogName() {
   return log_name;
 }
 
-void FispactProblem::setNuclearData(std::string nd_base_path) {
+void FispactProblem::setNuclearData(const std::string &nd_base_path) {
   fp::io::NuclearDataReader nd_reader(_fp_monitor);
 
   nd_reader.setPath(FISPACT_ND_IND_NUC_KEY,
@@ -706,4 +700,15 @@ void FispactProblem::setNuclearData(std::string nd_base_path) {
   nd_reader.setPath(FISPACT_ND_A2DATA_KEY, nd_base_path + "/decay/a2_2012");
 
   nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
+}
+
+const std::string FispactProblem::generateInterprocessName() {
+  char mpi_proc_name[MPI_MAX_PROCESSOR_NAME];
+  int len = 0;
+  int err = MPI_Get_processor_name(mpi_proc_name, &len);
+
+  std::string ipc_name = std::string(mpi_proc_name);
+  ipc_name += "_" + std::to_string(comm().rank());
+
+  return ipc_name;
 }
