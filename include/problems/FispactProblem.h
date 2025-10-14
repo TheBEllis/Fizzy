@@ -308,6 +308,9 @@ private:
   int _num_neutron_bins;
 
   ///
+  int _num_photon_bins;
+
+  ///
   std::string _schedule_uo_name;
 
   ///
