@@ -1,4 +1,3 @@
-#include "ExternalProblem.h"
 #include "FispactProblem.h"
 
 /// Custom user object includes
