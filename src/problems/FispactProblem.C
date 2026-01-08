@@ -1,4 +1,3 @@
-#include "ExternalProblem.h"
 #include "FispactProblem.h"
 
 /// Custom user object includes
@@ -9,18 +8,9 @@
 #include "MooseTypes.h"
 
 /// Fispact includes
-#include "fispactcompute.hpp"
-#include "fispactconstantsapi.h"
-#include "fispactelementaldata.hpp"
-#include "fispactgroupconvert.hpp"
-#include "fispactgroupstructures.hpp"
-#include "fispactinputdata.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactoutputdata.hpp"
-#include "fispactoutputdataapi.h"
-#include "fispactutil.hpp"
 
 //// PugiXML include
+#include "fispactutil.hpp"
 #include "pugixml.hpp"
 
 /// Cpp includes
@@ -31,10 +21,16 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include <mpi.h>
+
+// Avogadro's number
+#define AVOGADRO 6.0221408e+23
+
+#define MOLAR_MASS_DATASET_DIMS 1
 
 registerMooseObject("FizzyApp", FispactProblem);
 
@@ -105,6 +101,11 @@ InputParameters FispactProblem::validParams() {
       "comm_photon_flux", false,
       "Boolean value used to indicate whether to use boost::interprocess to "
       "communicate photon spectra through IPC.");
+
+  params.addRequiredParam<FileName>(
+      "molar_mass_data",
+      "Filename for HDF5 file containing molar mass data for all isotopes");
+
   return params;
 }
 
@@ -123,7 +124,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _local_domain_strength(0), _total_domain_strength(0),
       _write_photon_flux(getParam<bool>("write_photon_flux")),
       _comm_photon_flux(getParam<bool>("comm_photon_flux")),
-      _interprocess_segment_name(generateInterprocessName()) {
+      _interprocess_segment_name(generateInterprocessName()),
+      _molar_mass_data_filename(getParam<FileName>("molar_mass_data")) {
 
   /**
    * Load materials from xml file if read_materials_from_xml is set to true,
@@ -153,13 +155,16 @@ FispactProblem::FispactProblem(const InputParameters &params)
   setNeutronBins();
 
   /// Check a corresponding material exists for all mesh blocks
-  checkMaterialsExist();
+  // checkMaterialsExist();
 
   /// Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
 
   /// Set nuclear data paths
   setNuclearData(_fp_nuclear_data_path);
+
+  /// Load molar mass data
+  loadMolarMasses();
 
   /// Read neutron flux from h5 file
   if (_comm_photon_flux) {
@@ -246,9 +251,9 @@ void FispactProblem::externalSolve() {
       double element_volume = element->volume();
 
       /// Get element material definition
-      MaterialDefinition &el_mat = getElementMaterial(elem_id);
+      const FISPACTMaterial &mat = getElementMaterial(elem_id);
 
-      setFispactInputData(_fp_monitor, el_mat, neutron_flux, element_volume,
+      setFispactInputData(_fp_monitor, mat, neutron_flux, element_volume,
                           fispact_input);
       /// Run FISPACT
       fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
@@ -276,7 +281,10 @@ void FispactProblem::externalSolve() {
     updateLocalDomainStrength(element);
   }
 
-  writePhotonFlux(_photon_flux_filename);
+  if (_write_photon_flux) {
+    writePhotonFlux(_photon_flux_filename);
+  }
+
   fp::GlobalFinalise(_fp_monitor);
 }
 
@@ -375,8 +383,11 @@ void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
 void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
 
   // Retrieve gamma spectrum boundaries from first fispact inv step
-  int fispact_step = 0;
-  _photon_bins = fispact_output.getGammaSpectrumBoundaries(fispact_step);
+  int fispact_step = 1;
+  std::vector<double> bounds =
+      fispact_output.getGammaSpectrumBoundaries(fispact_step);
+
+  _photon_bins = bounds;
 
   // Scale photon bin entries to get them into eV
   for (int i = 0; i < _photon_bins.size(); i++) {
@@ -447,43 +458,70 @@ FispactProblem::readElementNeutronFlux(const std::string &filename,
  * setFispactInputMaterial
  */
 void FispactProblem::setFispactInputData(
-    const fp::FispactMonitor &monitor, const MaterialDefinition &material,
+    const fp::FispactMonitor &monitor, const FISPACTMaterial &material,
     const std::vector<double> &neutron_flux, const double &volume,
     fp::InputData &input) const {
 
   /// Set neutron flux
   input.setFlux(_neutron_bins, neutron_flux);
-
   input.setFluxWallLoading(1.0);
-
   input.setFluxName("neutrons");
 
-  /// get density from mat density
-  input.setDensity(material._mat_density);
+  /// Get density from mat density, in g/cm^3!
+  double density = material.getDensity();
+  input.setDensity(density);
+
+  /// Set atoms threshold
   input.setAtomsThreshold(1.0e3);
 
-  /// Volume read in is in cm ^ 3, so we need to scale by 1e-6, as mass is in kg
-  double total_mass = material._mat_density * volume * 1e-6;
-  input.setMassTotal(total_mass);
+  /// Volume read in is in cm^3, so we need to scale by 1e-6, as mass is in kg
+  double total_mass = density * volume * 1e-6;
 
-  std::vector<int> atomic_numbers;
-  std::vector<double> percent;
-  for (auto &element_name_ao_pair : material._mat_atomic_composition) {
-    std::string element_name = element_name_ao_pair.first;
+  //
+  if (material.getMaterialType() == "MASS") {
 
-    /** Remove numbers from element name, isotope doesn't matter here as we're
-      obtaining the atomic number, not the atomic mass **/
-    element_name.erase(
-        std::remove_if(element_name.begin(), element_name.end(),
-                       [](unsigned char c) { return std::isdigit(c); }),
-        element_name.end());
+    std::vector<int> atomic_numbers;
+    std::vector<double> percent;
 
-    atomic_numbers.push_back(
-        fp::util::GetAtomicNumberFromElementName(monitor, element_name));
-    percent.push_back(element_name_ao_pair.second);
+    /// Set total mass
+    input.setMassTotal(total_mass);
+
+    const std::unordered_map<std::string, double> &nuclideFractionMap =
+        material.getNuclideFractionMap();
+
+    std::vector<int> atomic_numbers;
+    atomic_numbers.reserve(nuclideFractionMap.size());
+
+    for (auto &[element_name, mass_fraction] : nuclideFractionMap) {
+
+      atomic_numbers.push_back(
+          fp::util::GetAtomicNumberFromElementName(monitor, element_name));
+    }
+
+    input.setMass(atomic_numbers, material.getNuclideFractions());
+
+  } else if (material.getMaterialType() == "FUEL") {
+
+    /// Get material map, that maps from map[nuclide_name] -> mass_fraction
+    const std::unordered_map<std::string, double> &nuclideFractionMap =
+        material.getNuclideFractionMap();
+
+    /// For all key (isotope name) value (mass_fraction) pairs in map, calculate
+    /// the number of atoms pertaining to each isotope and append to input fuel
+    for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
+
+      double zai_mass = total_mass * mass_fraction;
+
+      double zai = fp::util::GetZai(monitor, isotope_name);
+
+      double atoms = getNumAtoms(zai_mass, _molar_mass_map.at(zai), AVOGADRO);
+
+      input.appendFuel(zai, atoms);
+    }
   }
 
-  input.setMass(atomic_numbers, percent);
+  /// Get the fispact input schdule from the user object and set it in the
+  /// FISPACT input
   setFispactSchedule(input);
 }
 
@@ -496,19 +534,43 @@ void FispactProblem::setFispactSchedule(fp::InputData &input) const {
   input.setSchedule(times, flux_schedule);
 }
 
-FispactProblem::MaterialDefinition &
+const FISPACTMaterial &
 FispactProblem::getElementMaterial(dof_id_type &elem_id) {
+
   libMesh::Elem *elem = _mesh.elemPtr(elem_id);
 
-  const std::string &subdomain_name =
-      _mesh.getSubdomainName(elem->subdomain_id());
+  // Query the warehouse to see if a FISPACTMaterial exists on the block this
+  // element is assigned to
+  std::vector<GeneralUserObject *> objs;
+  theWarehouse()
+      .query()
+      .condition<AttribSystem>("UserObject")
+      .condition<AttribSubdomains>(elem->subdomain_id())
+      .queryInto(objs);
 
-  /// Return material definition if it exists, otherwise throw error
-  if (_mat_definitions.find(subdomain_name) == _mat_definitions.end()) {
-    mooseError("No FISPACT material named " + subdomain_name + " was found.");
+  // Remove extraneous user objects that are not FISPACTMaterials. Having done
+  // this, only one object should remain in the vector, and it should be the
+  for (auto it = objs.begin(); it != objs.end();) {
+    if ((*it)->type() != "FISPACTMaterial") {
+      it = objs.erase(it);
+    } else {
+      ++it;
+    }
   }
 
-  return _mat_definitions.at(subdomain_name);
+  // FISPACT material pertaining to this block. If there ismore than one object,
+  // then two FISPACTMaterials are assigned to this block, and that makes no
+  // blimmin sense does it
+  if (objs.empty()) {
+    mooseError("Unable to find FISPACTMaterial object on block " +
+               std::to_string(elem->subdomain_id()));
+  } else if (objs.size() > 1) {
+    mooseError("More than 1 FISPACTMaterial definition exists on block " +
+               std::to_string(elem->subdomain_id()));
+  }
+
+  /// Return the FISPACTMaterial
+  return *(static_cast<FISPACTMaterial *>(objs[0]));
 }
 
 bool FispactProblem::isFlux(const std::vector<double> &flux) const {
@@ -562,27 +624,6 @@ void FispactProblem::setNeutronBins() {
     _num_neutron_bins = 1102;
   }
   /// TODO: Add more bins types
-}
-
-void FispactProblem::checkMaterialsExist() const {
-
-  /// Fetch all subdomain ID's from libmesh
-  std::vector<unsigned short> subdomain_ids;
-  for (auto &subdomain_id : _mesh.meshSubdomains()) {
-    subdomain_ids.push_back(subdomain_id);
-  }
-
-  /// Fetch all subdomain names using libmesh
-  std::vector<SubdomainName> subdomain_names =
-      _mesh.getSubdomainNames(subdomain_ids);
-
-  /// Check that for all subdomain names there is an associated material
-  for (auto &subdomain_name : subdomain_names) {
-    if (_mat_definitions.find(subdomain_name) == _mat_definitions.end()) {
-      mooseError("Block " + subdomain_name +
-                 " does not have a corresponding FISPACT material defined");
-    }
-  }
 }
 
 void FispactProblem::convertGammaEvToCount(
@@ -719,4 +760,43 @@ const std::string FispactProblem::generateInterprocessName() {
   ipc_name += "_" + std::to_string(comm().rank());
 
   return ipc_name;
+}
+
+double FispactProblem::getNumAtoms(const double &mass, const double &molar_mass,
+                                   const double &avogadro) const {
+  return (mass / molar_mass) * avogadro;
+}
+
+void FispactProblem::loadMolarMasses() {
+
+  hid_t molar_mass_file = hdf5_utils::file_open(
+      _molar_mass_data_filename.c_str(), 'r', false, comm().get());
+
+  hid_t molar_mass_dataset =
+      hdf5_utils::open_dataset(molar_mass_file, "MolarMass");
+
+  hid_t element_symbols_dataset =
+      hdf5_utils::open_dataset(molar_mass_file, "symbol");
+
+  hsize_t molar_mass_dims[MOLAR_MASS_DATASET_DIMS];
+
+  hdf5_utils::get_shape(molar_mass_dataset, molar_mass_dims);
+
+  // Vectors to store molar masses and respective element symbols
+  std::vector<double> molar_masses(molar_mass_dims[0]);
+  std::vector<std::string> element_symbols(molar_mass_dims[0]);
+
+  hdf5_utils::read_double(molar_mass_dataset, nullptr, molar_masses.data(),
+                          false);
+
+  hdf5_utils::read_string(element_symbols_dataset, nullptr, element_symbols, 8,
+                          false);
+
+  for (int i = 0; i < molar_masses.size(); i++) {
+
+    int zai = fp::util::GetZai(_fp_monitor, element_symbols[i]);
+    std::pair<int, double> key_value =
+        std::pair<int, double>(zai, molar_masses[i]);
+    _molar_mass_map.insert(key_value);
+  }
 }

@@ -80,6 +80,10 @@ void read_double(hid_t obj_id, const char *name, double *buffer, bool parallel,
 void read_int(hid_t obj_id, const char *name, int *buffer, bool parallel,
               bool indep = true);
 
+void read_string(hid_t obj_id, const char *name,
+                 std::vector<std::string> &buffer, int slen, bool parallel,
+                 bool indep = true);
+
 bool using_mpio_device(hid_t obj_id);
 
 void read_double_hyperslab(hid_t group_id, const char *name, hsize_t rank,

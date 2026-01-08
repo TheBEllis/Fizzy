@@ -3,6 +3,7 @@
 #include "fmt/format.h"
 #include "mpi.h"
 #include <hdf5/openmpi/H5Ipublic.h>
+#include <hdf5/openmpi/H5Tpublic.h>
 #include <string>
 
 namespace hdf5_utils {
@@ -240,6 +241,35 @@ void read_int(hid_t obj_id, const char *name, int *buffer, bool parallel,
               bool indep) {
   read_dataset_lowlevel(obj_id, name, H5T_NATIVE_INT, H5S_ALL, buffer, parallel,
                         indep);
+}
+
+void read_string(hid_t obj_id, const char *name,
+                 std::vector<std::string> &buffer, int slen, bool parallel,
+                 bool indep) {
+
+  /// Currently easier to read into a char buffer and then use the predefined
+  /// string length to seperate the char buffer into strings
+  std::vector<char> char_buff(slen * buffer.size());
+
+  /// Create datatype for "string"
+  hid_t datatype = H5Tcopy(H5T_C_S1);
+  H5Tset_size(datatype, slen);
+
+  H5Tset_strpad(datatype, H5T_STR_NULLPAD);
+
+  /// Read strings into char buffer
+  read_dataset_lowlevel(obj_id, name, datatype, H5S_ALL, char_buff.data(),
+                        parallel, indep);
+
+  /// Split vector of chars into strings of length slen
+  for (size_t i = 0; i < buffer.size(); i++) {
+    std::string s(char_buff.data() + i * slen, slen);
+    s.erase(s.find_last_not_of("\0 ") + 1);
+    buffer[i] = std::move(s);
+  }
+
+  /// Free memory allocated to datatype
+  H5Tclose(datatype);
 }
 
 void read_double_hyperslab(hid_t obj_id, const char *name, hsize_t ndim,
