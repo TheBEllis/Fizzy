@@ -39,7 +39,6 @@ FISPACTMaterial::FISPACTMaterial(const InputParameters &parameters)
   std::vector<double> nuclide_fraction =
       getParam<std::vector<double>>("nuclide_fraction");
 
-  std::cout << name() << std::endl;
   // Check _nuclides and _nuclide_fraction are of equal length
   if (nuclides.size() != nuclide_fraction.size()) {
     mooseError("Nuclides list length does not match nuclide fraction list "
