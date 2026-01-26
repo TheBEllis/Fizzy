@@ -2,8 +2,6 @@
 #include "MooseError.h"
 #include "fmt/format.h"
 #include "mpi.h"
-#include <hdf5/openmpi/H5Ipublic.h>
-#include <hdf5/openmpi/H5Tpublic.h>
 #include <string>
 
 namespace hdf5_utils {
