@@ -489,7 +489,6 @@ void FispactProblem::setFispactInputData(
     const std::unordered_map<std::string, double> &nuclideFractionMap =
         material.getNuclideFractionMap();
 
-    std::vector<int> atomic_numbers;
     atomic_numbers.reserve(nuclideFractionMap.size());
 
     for (auto &[element_name, mass_fraction] : nuclideFractionMap) {
