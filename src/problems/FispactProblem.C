@@ -740,12 +740,16 @@ void FispactProblem::setNuclearData(const std::string &nd_base_path) {
 
   nd_reader.setPath(FISPACT_ND_DK_ENDF_KEY,
                     nd_base_path + "decay2020/decay_2020");
-  nd_reader.setPath(FISPACT_ND_ABSORP_KEY, nd_base_path + "decay/abs_2012");
+
+  nd_reader.setPath(FISPACT_ND_ABSORP_KEY,
+                    nd_base_path + "decay_2012/abs_2012");
 
   nd_reader.setPath(FISPACT_ND_HAZARDS_KEY,
-                    nd_base_path + "/decay/hazards_2012");
-  nd_reader.setPath(FISPACT_ND_CLEAR_KEY, nd_base_path + "/decay/clear_2012");
-  nd_reader.setPath(FISPACT_ND_A2DATA_KEY, nd_base_path + "/decay/a2_2012");
+                    nd_base_path + "/decay_2012/hazards_2012");
+  nd_reader.setPath(FISPACT_ND_CLEAR_KEY,
+                    nd_base_path + "/decay_2012/clear_2012");
+  nd_reader.setPath(FISPACT_ND_A2DATA_KEY,
+                    nd_base_path + "/decay_2012/a2_2012");
 
   nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
 }
