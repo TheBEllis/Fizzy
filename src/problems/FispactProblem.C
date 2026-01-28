@@ -296,7 +296,7 @@ void FispactProblem::writePhotonFlux(const std::string &filename) {
 #ifdef H5_HAVE_PARALLEL
   bool parallel = true;
 #else
-  parallel = false;
+  bool parallel = false;
 #endif
   /// Open OpenMC statepoint file with Neutron Flux
   hid_t file_id =
