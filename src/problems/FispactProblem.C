@@ -1,5 +1,6 @@
 #include "FispactProblem.h"
 
+#include "../../include/userobjects/FispactNuclearDataPaths.C"
 /// Custom user object includes
 #include "FispactSchedule.h"
 
@@ -160,9 +161,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
   /// Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
 
-  /// Set nuclear data paths
-  setNuclearData(_fp_nuclear_data_path);
-
   /// Load molar mass data
   loadMolarMasses();
 
@@ -220,6 +218,9 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
 }
 
 void FispactProblem::externalSolve() {
+
+  /// Set nuclear data paths
+  setNuclearData(_fp_nuclear_data_path);
 
   /// Set up fispact input data
   fp::InputData fispact_input(_fp_monitor);
@@ -723,35 +724,39 @@ std::string FispactProblem::fispactLogName() {
 }
 
 void FispactProblem::setNuclearData(const std::string &nd_base_path) {
-  fp::io::NuclearDataReader nd_reader(_fp_monitor);
 
-  nd_reader.setPath(FISPACT_ND_IND_NUC_KEY,
-                    nd_base_path + "decay2020/decay_2020_index.txt");
+  FispactNuclearDataPaths &nuclear_data_paths =
+      getUserObject<FispactNuclearDataPaths>("nuclear_data");
 
-  nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY,
-                    nd_base_path + "TENDL2021data/gendf-1102");
-  nd_reader.setPath(FISPACT_ND_PROB_TAB_KEY,
-                    nd_base_path + "TENDL2021data/tp-1102-294");
-
-  nd_reader.setPath(FISPACT_ND_FY_ENDF_KEY,
-                    nd_base_path + "GEFY61data/gefy61_nfy");
-  nd_reader.setPath(FISPACT_ND_SF_ENDF_KEY,
-                    nd_base_path + "GEFY61data/gefy61_sfy");
-
-  nd_reader.setPath(FISPACT_ND_DK_ENDF_KEY,
-                    nd_base_path + "decay2020/decay_2020");
-
-  nd_reader.setPath(FISPACT_ND_ABSORP_KEY,
-                    nd_base_path + "decay_2012/abs_2012");
-
-  nd_reader.setPath(FISPACT_ND_HAZARDS_KEY,
-                    nd_base_path + "/decay_2012/hazards_2012");
-  nd_reader.setPath(FISPACT_ND_CLEAR_KEY,
-                    nd_base_path + "/decay_2012/clear_2012");
-  nd_reader.setPath(FISPACT_ND_A2DATA_KEY,
-                    nd_base_path + "/decay_2012/a2_2012");
-
-  nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
+  nuclear_data_paths.loadNuclearData(_fp_nuclear_data, _fp_monitor,
+                                     load_callback);
+  // nd_reader.setPath(FISPACT_ND_IND_NUC_KEY,
+  //                   nd_base_path + "decay2020/decay_2020_index.txt");
+  //
+  // nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY,
+  //                   nd_base_path + "TENDL2021data/gendf-1102");
+  // nd_reader.setPath(FISPACT_ND_PROB_TAB_KEY,
+  //                   nd_base_path + "TENDL2021data/tp-1102-294");
+  //
+  // nd_reader.setPath(FISPACT_ND_FY_ENDF_KEY,
+  //                   nd_base_path + "GEFY61data/gefy61_nfy");
+  // nd_reader.setPath(FISPACT_ND_SF_ENDF_KEY,
+  //                   nd_base_path + "GEFY61data/gefy61_sfy");
+  //
+  // nd_reader.setPath(FISPACT_ND_DK_ENDF_KEY,
+  //                   nd_base_path + "decay2020/decay_2020");
+  //
+  // nd_reader.setPath(FISPACT_ND_ABSORP_KEY, nd_base_path +
+  // "decay2012/abs_2012");
+  //
+  // nd_reader.setPath(FISPACT_ND_HAZARDS_KEY,
+  //                   nd_base_path + "/decay2012/hazards_2012");
+  // nd_reader.setPath(FISPACT_ND_CLEAR_KEY,
+  //                   nd_base_path + "/decay2012/clear_2012");
+  // nd_reader.setPath(FISPACT_ND_A2DATA_KEY, nd_base_path +
+  // "/decay2012/a2_2012");
+  //
+  // nd_reader.load(_fp_nuclear_data, &FispactProblem::load_callback);
 }
 
 const std::string FispactProblem::generateInterprocessName() {
