@@ -12,8 +12,7 @@ registerMooseObject("FizzyApp", FispactNuclearDataPaths);
 InputParameters FispactNuclearDataPaths::validParams() {
   InputParameters params = GeneralUserObject::validParams();
 
-  params.addRequiredParam<std::string>("base_path", "");
-
+  params.addParam<std::string>("base_path", "", "");
   params.addParam<std::string>("ND_IND_NUC_KEY", "");
   params.addParam<std::string>("ND_HAZARDS_KEY", "");
   params.addParam<std::string>("ND_ABSORP_KEY", "");
@@ -39,17 +38,18 @@ InputParameters FispactNuclearDataPaths::validParams() {
 
 FispactNuclearDataPaths::FispactNuclearDataPaths(
     const InputParameters &parameters)
-    : GeneralUserObject(parameters),
-      _base_path(getParam<std::string>("base_path")) {}
+    : GeneralUserObject(parameters) {}
 
 void FispactNuclearDataPaths::loadNuclearData(
     fispact::NuclearData &nd, fispact::FispactMonitor &fp_monitor,
     std::function<void(std::string, std::string, int, int)> callback) {
   fispact::io::NuclearDataReader nd_reader(fp_monitor);
 
+  std::string base_path = getParam<std::string>("base_path");
+
   if (isParamValid("ND_IND_NUC_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_IND_NUC_KEY");
+    std::string path = base_path + getParam<std::string>("ND_IND_NUC_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_IND_NUC_KEY",
@@ -61,7 +61,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_HAZARDS_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_HAZARDS_KEY");
+    std::string path = base_path + getParam<std::string>("ND_HAZARDS_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_HAZARDS_KEY",
@@ -73,7 +73,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_ABSORP_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_ABSORP_KEY");
+    std::string path = base_path + getParam<std::string>("ND_ABSORP_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_ABSORP_KEY",
@@ -85,7 +85,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_CLEAR_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_CLEAR_KEY");
+    std::string path = base_path + getParam<std::string>("ND_CLEAR_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_CLEAR_KEY", path + " is not a valid path! Could not set ");
@@ -96,7 +96,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_A2DATA_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_A2DATA_KEY");
+    std::string path = base_path + getParam<std::string>("ND_A2DATA_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_A2DATA_KEY",
@@ -108,7 +108,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_ENBINS_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_ENBINS_KEY");
+    std::string path = base_path + getParam<std::string>("ND_ENBINS_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_ENBINS_KEY",
@@ -120,7 +120,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_DECAY_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_DECAY_KEY");
+    std::string path = base_path + getParam<std::string>("ND_DECAY_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_DECAY_KEY", path + " is not a valid path! Could not set ");
@@ -131,7 +131,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_DK_ENDF_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_DK_ENDF_KEY");
+    std::string path = base_path + getParam<std::string>("ND_DK_ENDF_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_DK_ENDF_KEY",
@@ -143,7 +143,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_PROB_TAB_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_PROB_TAB_KEY");
+    std::string path = base_path + getParam<std::string>("ND_PROB_TAB_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_PROB_TAB_KEY",
@@ -155,7 +155,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_ASSCFY_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_ASSCFY_KEY");
+    std::string path = base_path + getParam<std::string>("ND_ASSCFY_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_ASSCFY_KEY",
@@ -167,7 +167,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_FISSYLD_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_FISSYLD_KEY");
+    std::string path = base_path + getParam<std::string>("ND_FISSYLD_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_FISSYLD_KEY",
@@ -179,7 +179,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_FY_ENDF_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_FY_ENDF_KEY");
+    std::string path = base_path + getParam<std::string>("ND_FY_ENDF_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_FY_ENDF_KEY",
@@ -191,7 +191,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_SF_ENDF_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_SF_ENDF_KEY");
+    std::string path = base_path + getParam<std::string>("ND_SF_ENDF_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_SF_ENDF_KEY",
@@ -203,7 +203,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_SP_ENDF_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_SP_ENDF_KEY");
+    std::string path = base_path + getParam<std::string>("ND_SP_ENDF_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_SP_ENDF_KEY",
@@ -215,7 +215,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_XS_EXTRA_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_XS_EXTRA_KEY");
+    std::string path = base_path + getParam<std::string>("ND_XS_EXTRA_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_XS_EXTRA_KEY",
@@ -227,7 +227,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_CROSSEC_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_CROSSEC_KEY");
+    std::string path = base_path + getParam<std::string>("ND_CROSSEC_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_CROSSEC_KEY",
@@ -239,7 +239,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_CROSSUNC_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_CROSSUNC_KEY");
+    std::string path = base_path + getParam<std::string>("ND_CROSSUNC_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_CROSSUNC_KEY",
@@ -251,7 +251,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_XS_ENDF_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_XS_ENDF_KEY");
+    std::string path = base_path + getParam<std::string>("ND_XS_ENDF_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_XS_ENDF_KEY",
@@ -263,7 +263,7 @@ void FispactNuclearDataPaths::loadNuclearData(
 
   if (isParamValid("ND_XS_ENDFB_KEY")) {
     /// check path exists
-    std::string path = _base_path + getParam<std::string>("ND_XS_ENDFB_KEY");
+    std::string path = base_path + getParam<std::string>("ND_XS_ENDFB_KEY");
 
     if (!(std::filesystem::exists(path))) {
       paramError("ND_XS_ENDFB_KEY",
