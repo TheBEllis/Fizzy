@@ -18,6 +18,7 @@
   molar_mass_data = '../../molar_masses.h5'
 
   fispact_schedule_uo = 'Schedule'
+  fispact_nuclear_data_uo = 'endf_nuclear_data'
 []
 
 [UserObjects]
@@ -36,7 +37,7 @@
     density = 5
   []
 
-  [nuclear_data]
+  [endf_nuclear_data]
     type = FispactNuclearDataPaths
     base_path = "/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "ENDFB80data/endfb80_index.txt"
