@@ -66,8 +66,9 @@ InputParameters FispactProblem::validParams() {
       "neutron_flux_tally_id",
       "Path within HDF5 file for the vector storing neutron flux");
 
-  params.addRequiredParam<FileName>("fispact_nuclear_data_path",
-                                    "Path to FISPACT nuclear data");
+  params.addRequiredParam<std::string>(
+      "fispact_nuclear_data_uo", "Name of the FispactNuclearDataPaths objects "
+                                 "to use for setting nuclear data");
 
   params.addRequiredParam<std::string>("neutron_bin_type",
                                        "neutron binning scheme for FISPACT");
@@ -113,7 +114,7 @@ InputParameters FispactProblem::validParams() {
 FispactProblem::FispactProblem(const InputParameters &params)
     : ExternalProblem(params), _fp_monitor(fispactLogName()),
       _fp_nuclear_data(_fp_monitor),
-      _fp_nuclear_data_path(getParam<FileName>("fispact_nuclear_data_path")),
+      _fp_nuclear_data_uo(getParam<std::string>("fispact_nuclear_data_uo")),
       _neutron_flux_filename(getParam<FileName>("neutron_flux_file")),
       _neutron_flux_tally_id(getParam<int>("neutron_flux_tally_id")),
       _photon_flux_filename(getParam<FileName>("photon_flux_filename")),
@@ -220,7 +221,7 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
 void FispactProblem::externalSolve() {
 
   /// Set nuclear data paths
-  setNuclearData(_fp_nuclear_data_path);
+  setNuclearData(_fp_nuclear_data_uo);
 
   /// Set up fispact input data
   fp::InputData fispact_input(_fp_monitor);
@@ -723,10 +724,10 @@ std::string FispactProblem::fispactLogName() {
   return log_name;
 }
 
-void FispactProblem::setNuclearData(const std::string &nd_base_path) {
+void FispactProblem::setNuclearData(const std::string &fp_nuclear_data_uo) {
 
   FispactNuclearDataPaths &nuclear_data_paths =
-      getUserObject<FispactNuclearDataPaths>("nuclear_data");
+      getUserObject<FispactNuclearDataPaths>(fp_nuclear_data_uo);
 
   nuclear_data_paths.loadNuclearData(_fp_nuclear_data, _fp_monitor,
                                      load_callback);

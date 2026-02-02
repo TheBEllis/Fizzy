@@ -83,7 +83,7 @@ private:
    * resources required for fispact
    *
    */
-  void setNuclearData(const std::string &nd_base_path);
+  void setNuclearData(const std::string &fp_nuclear_data_uo);
 
   /**
    *
@@ -306,7 +306,7 @@ private:
   std::unordered_map<int, double> _element_strengths;
 
   /// Fispact nuclear data path
-  std::string _fp_nuclear_data_path;
+  std::string _fp_nuclear_data_uo;
 
   /// hdf5 filename for neutron flux
   std::string _neutron_flux_filename;
