@@ -7,8 +7,6 @@
 
 [Problem]
   type = FispactProblem 
-  fispact_nuclear_data_path = '/home/bill/Projects/FISPACT/nuclear_data/'
-  #fispact_nuclear_data_path = '/home/bill/Projects/FispactNuclearData/ENDFB80data/'
 
   neutron_flux_file = './../statepoint.2.h5'
   neutron_flux_tally_id = 1
@@ -41,18 +39,12 @@
   [nuclear_data]
     type = FispactNuclearDataPaths
     base_path = "/Projects/FispactNuclearData/"
-    ND_IND_NUC_KEY = "/decay_2020_index.txt"
-    ND_XS_ENDF_KEY = "TENDL2021data/gendf-1102"
-    ND_PROB_TAB_KEY = "TENDL2021data/tp-1102-294"
-    ND_FY_ENDF_KEY = "GEFY61data/gefy61_nfy"
-    ND_SF_ENDF_KEY = "GEFY61data/gefy61_sfy"
-    ND_DK_ENDF_KEY = "decay_2020"
-    ND_ABSORP_KEY = "decay_2012/abs_2012"
-    ND_HAZARDS_KEY = "decay_2012/hazards_2012"
-    ND_CLEAR_KEY = "decay_2012/clear_2012"
-    ND_A2DATA_KEY = "decay_2012/a2_2012"
-
-    execute_on = INITIAL
+    ND_IND_NUC_KEY = "ENDFB80data/endfb80_index.txt"
+    ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
+    ND_FY_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80nfy"
+    ND_SF_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80sfy"
+    ND_DK_ENDF_KEY = "ENDFB80data/decay"
+    ND_ABSORP_KEY = "decay/abs_2012"
   []
 []
 
