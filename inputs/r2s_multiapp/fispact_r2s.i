@@ -15,18 +15,19 @@
 
 [Problem]
   type = FispactProblem 
-  fispact_nuclear_data_path = '/home/bill/Projects/FISPACT/nuclear_data/'
-
   neutron_flux_file = './statepoint.10.h5'
   neutron_flux_tally_id = 2
   neutron_bin_type = 'G1102'
-  write_photon_flux = True
+
+  write_photon_flux = False
   photon_flux_filename = 'photon_spectra_out'
+
   comm_photon_flux = True
 
-  fispact_schedule_uo = 'Schedule'
+  molar_mass_data = '../../molar_masses.h5'
 
-  molar_mass_data = '/home/bill/Projects/SINBAD/FNGPython/FISPACT/molar_masses.h5'
+  fispact_schedule_uo = 'Schedule'
+  fispact_nuclear_data_uo = 'endf_nuclear_data'
 []
 
 [UserObjects]
@@ -44,6 +45,17 @@
     block = 1
     density = 5
   []
+
+  [endf_nuclear_data]
+    type = FispactNuclearDataPaths
+    base_path = "/Projects/FispactNuclearData/"
+    ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
+    ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
+    ND_FY_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80nfy"
+    ND_SF_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80sfy"
+    ND_DK_ENDF_KEY = "ENDFB80data/decay"
+    ND_ABSORP_KEY = "decay/abs_2012"
+  []
 []
 
 [MultiApps]
@@ -51,8 +63,8 @@
     type = FullSolveMultiApp
     execute_on = timestep_end
     app_type = 'CardinalApp'
-    input_files = '/home/bill/Projects/fizzy/inputs/r2s_multiapp/photons_input.i'
-    library_path = '/home/bill/Projects/cardinal/lib/'
+    input_files = '/Projects/Fizzy/inputs/r2s_multiapp/photons_input.i'
+    library_path = '/Projects/cardinal/lib/'
     library_name = 'libcardinal-opt.la'
   []
 []
