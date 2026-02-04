@@ -421,22 +421,36 @@ FispactProblem::readElementNeutronFlux(const std::string &filename,
   hid_t neutron_tally_group_id =
       hdf5_utils::open_group(tallies_group_id, tally_group_name);
 
-  /// Define size of selection of neutron flux
-  hsize_t dims[3]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
-  hsize_t start[]{elem_id * _num_neutron_bins, 0, 0};
-  hsize_t count[]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
-
   /// Get number of tally realizations
   int n_realizations;
   hdf5_utils::read_int(neutron_tally_group_id, "n_realizations",
                        &n_realizations, parallel, true);
+
+  /// Define size of selection of neutron flux
+  hsize_t dataset_dims[3];
+  hsize_t hyperslab_dims[3]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
+  hsize_t start[]{elem_id * _num_neutron_bins, 0, 0};
+  hsize_t count[]{static_cast<hsize_t>(_num_neutron_bins), 1, 1};
+
+  // Check this statepoint file is of
+  hid_t flux_dataset =
+      hdf5_utils::open_dataset(neutron_tally_group_id, "results");
+  hdf5_utils::get_shape(flux_dataset, dataset_dims);
+
+  if (dataset_dims[0] != _num_neutron_bins * _mesh.getMesh().n_elem()) {
+    mooseError("Provided tally dimensions do not conform to this mesh and "
+               "neutron bin structure. Tally dimensions are (" +
+               std::to_string(dataset_dims[0]) + "," +
+               std::to_string(dataset_dims[1]) + "," +
+               std::to_string(dataset_dims[2]) + ")");
+  }
 
   std::vector<double> neutron_flux_results(_num_neutron_bins, 0);
 
   /// Number of dimensions of hyperslab to read
   hsize_t rank = 3;
   hdf5_utils::read_double_hyperslab(neutron_tally_group_id, "results", rank,
-                                    dims, start, count,
+                                    hyperslab_dims, start, count,
                                     neutron_flux_results.data(), parallel);
 
   hdf5_utils::close_group(tallies_group_id);
