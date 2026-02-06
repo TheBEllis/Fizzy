@@ -298,7 +298,10 @@ void FispactProblem::writePhotonFlux(const std::string &filename) {
 #ifdef H5_HAVE_PARALLEL
   bool parallel = true;
 #else
-  bool parallel = false;
+  mooseWarning(
+      "Writing photon flux requires HDF5 compiled with MPI. "
+      "Simulation continuing, but photon spectra will not be written.");
+  return;
 #endif
   /// Open OpenMC statepoint file with Neutron Flux
   hid_t file_id =
@@ -343,9 +346,9 @@ void FispactProblem::writePhotonFlux(const std::string &filename) {
     /// count specifies the number of entries we wish to write in each dimension
     hsize_t count[2] = {1, _num_photon_bins};
 
-    hdf5_utils::write_double_hyperslab(h5_dataset, nullptr, ndim,
-                                       hyperslab_dims, start, count,
-                                       element_flux_pair.second.data(), true);
+    hdf5_utils::write_double_hyperslab(
+        h5_dataset, nullptr, ndim, hyperslab_dims, start, count,
+        element_flux_pair.second.data(), parallel);
   }
   /// Close all the HDF5 bits and pieces
   H5Dclose(h5_dataset);
