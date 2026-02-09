@@ -1,6 +1,6 @@
 [Mesh]
   type = FileMesh
-  file = "./geometry/cube_hex.e"
+  file = "../../geometry/cube.e"
 []
 
 [Problem]
