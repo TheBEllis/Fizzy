@@ -524,18 +524,23 @@ void FispactProblem::setFispactInputData(
     const std::unordered_map<std::string, double> &nuclideFractionMap =
         material.getNuclideFractionMap();
 
+    std::vector<int> zais;
+    zais.reserve(nuclideFractionMap.size());
+    std::vector<double> atoms;
+    atoms.reserve(nuclideFractionMap.size());
+
     /// For all key (isotope name) value (mass_fraction) pairs in map, calculate
     /// the number of atoms pertaining to each isotope and append to input fuel
     for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
 
       double zai_mass = total_mass * mass_fraction;
 
-      double zai = fp::util::GetZai(monitor, isotope_name);
+      zais.push_back(fp::util::GetZai(monitor, isotope_name));
 
-      double atoms = getNumAtoms(zai_mass, _molar_mass_map.at(zai), AVOGADRO);
-
-      input.appendFuel(zai, atoms);
+      atoms.push_back(
+          getNumAtoms(zai_mass, _molar_mass_map.at(zais.back()), AVOGADRO));
     }
+    input.setFuel(zais, atoms);
   }
 
   /// Get the fispact input schdule from the user object and set it in the
