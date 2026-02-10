@@ -12,8 +12,8 @@ public:
   virtual void finalize() {}
   virtual void execute() {}
 
-  const std::vector<double> &getFluxSchedule();
-  const std::vector<double> &getTimes();
+  const std::vector<double> &getFluxSchedule() const;
+  const std::vector<double> &getTimes() const;
 
 protected:
   /// Vector of flux amplitudes

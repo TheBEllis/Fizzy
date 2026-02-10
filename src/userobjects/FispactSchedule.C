@@ -25,8 +25,8 @@ FispactSchedule::FispactSchedule(const InputParameters &parameters)
               "The length of the flux_schdule and times must be equal");
 }
 
-const std::vector<double> &FispactSchedule::getFluxSchedule() {
+const std::vector<double> &FispactSchedule::getFluxSchedule() const {
   return _flux_schedule;
 }
 
-const std::vector<double> &FispactSchedule::getTimes() { return _times; }
+const std::vector<double> &FispactSchedule::getTimes() const { return _times; }
