@@ -1,7 +1,7 @@
 [Mesh]
   [fmg]
     type = FileMeshGenerator
-    file = "../../example_geom/cube.e"
+    file = "../../geometry/cube.e"
   []
 []
 
@@ -9,7 +9,7 @@
   type = FispactProblem 
   fispact_nuclear_data_path = '/home/bill/Projects/FISPACT/nuclear_data/'
 
-  neutron_flux_file = './../statepoint.2.h5'
+  neutron_flux_file = './../statepoint_neutrons.10.h5'
   neutron_flux_tally_id = 1
   neutron_bin_type = 'G1102'
 
