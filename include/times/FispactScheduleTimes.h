@@ -1,5 +1,6 @@
 #pragma once
 // Moose includes
+#include "FispactSchedule.h"
 #include "Times.h"
 
 /**
@@ -13,4 +14,8 @@ public:
 
 protected:
   virtual void initialize() override {}
+
+  const FispactSchedule &_schedule;
+
+  std::vector<Real> _fispact_times;
 };

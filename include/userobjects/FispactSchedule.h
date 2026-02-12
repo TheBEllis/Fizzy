@@ -14,6 +14,7 @@ public:
 
   const std::vector<double> &getFluxSchedule() const;
   const std::vector<double> &getTimes() const;
+  const std::vector<double> &getCumulativeTimes() const;
 
 protected:
   /// Vector of flux amplitudes
@@ -21,4 +22,7 @@ protected:
 
   /// List of times corresponding to the list of flux amplitudes on or off
   const std::vector<double> _times;
+
+  /// Cumulative version of _times
+  std::vector<double> _cumulative_times;
 };

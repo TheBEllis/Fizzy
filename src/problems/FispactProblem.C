@@ -1,3 +1,4 @@
+#include "ExternalProblem.h"
 #include "FispactProblem.h"
 
 #include "../../include/userobjects/FispactNuclearDataPaths.C"
@@ -73,7 +74,7 @@ InputParameters FispactProblem::validParams() {
   params.addRequiredParam<std::string>("neutron_bin_type",
                                        "neutron binning scheme for FISPACT");
 
-  params.addRequiredParam<std::string>(
+  params.addRequiredParam<UserObjectName>(
       "fispact_schedule_uo", "Name of the FispactSchedule user object defining "
                              "the FISPACT flux schedule");
 
@@ -122,7 +123,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _materials_xml_file(getParam<FileName>("materials_xml_file")),
       _neutron_bin_type(getParam<std::string>("neutron_bin_type")),
       _num_photon_bins(getParam<int>("num_photon_bins")),
-      _schedule_uo_name(getParam<std::string>("fispact_schedule_uo")),
+      _schedule_uo_name(getParam<UserObjectName>("fispact_schedule_uo")),
       _local_domain_strength(0), _total_domain_strength(0),
       _write_photon_flux(getParam<bool>("write_photon_flux")),
       _comm_photon_flux(getParam<bool>("comm_photon_flux")),
@@ -187,110 +188,156 @@ FispactProblem::FispactProblem(const InputParameters &params)
   }
 }
 
-void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
-  if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
+void FispactProblem::initialSetup() {
+  ExternalProblem::initialSetup();
 
-    if (_comm_photon_flux) {
-#ifdef LIBMESH_HAVE_BOOST
+  /// Set nuclear data paths
+  setNuclearData(_fp_nuclear_data_uo);
 
-      /// Create vector to store all local domain strengths
-      std::vector<double> local_domain_strengths;
+  /// Get n FISPACT Schedule Times
+  FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
-      /// Gather local domain strengths from all processors
-      comm().allgather(_local_domain_strength, local_domain_strengths);
+  /// Set _n_inventories
+  _n_inventories = schedule.getTimes().size();
 
-      /// Calculate TotalDomainStrength
-      getTotalDomainStrength();
+  /// Reserve space in our solution vector
+  _photon_energy_spectra.resize(
+      _mesh.nActiveLocalElem() * _n_inventories * _num_photon_bins, 0);
 
-      /// Create a shared instantiation of the photon sharing class
-      PhotonSharingData *photon_sharing_instance =
-          _segment.construct<PhotonSharingData>(
-              "PhotonSharingData photon_sharing_instance")(
-              _segment, _photon_fluxes, _element_strengths, _num_photon_bins,
-              (int)_mesh.getMesh().n_active_local_elem(),
-              _total_domain_strength, _local_domain_strength,
-              local_domain_strengths, _photon_bins);
-#else
-      mooseError("_comm_photon_flux is set to true but libmesh was not built "
-                 "with BOOST. No communication occuring.");
-#endif
-    }
+  /// Reserve space for element strengths vector
+  _element_strengths.resize(_mesh.nActiveLocalElem() * _n_inventories, 0);
+
+  _local_domain_strength.reserve(_n_inventories);
+
+  _total_domain_strength.reserve(_n_inventories);
+
+  /// Set up local element index map
+  int local_elem_idx = 0;
+  for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
+    _local_elem_index.insert(
+        std::pair<int, int>(element->id(), local_elem_idx++));
   }
 }
 
 void FispactProblem::externalSolve() {
 
-  /// Set nuclear data paths
-  setNuclearData(_fp_nuclear_data_uo);
+  if (!_solved) {
 
-  /// Set up fispact input data
-  fp::InputData fispact_input(_fp_monitor);
-  fp::OutputData fispact_output(_fp_monitor);
+    /// Set up fispact input data
+    fp::InputData fispact_input(_fp_monitor);
+    fp::OutputData fispact_output(_fp_monitor);
 
-  int counter = 1;
-  for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
+    int counter = 1;
+    for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
-    /// Get element id
-    dof_id_type elem_id = element->id();
+      /// Get element id
+      dof_id_type elem_id = element->id();
 
-    _console << "Elem ID: " << std::to_string(elem_id) << std::endl;
+      _console << std::endl
+               << "Elem ID: " << std::to_string(elem_id) << std::endl;
 
-    std::vector<double> neutron_flux = readElementNeutronFlux(
-        _neutron_flux_filename, elem_id, _neutron_flux_tally_id);
+      std::vector<double> neutron_flux = readElementNeutronFlux(
+          _neutron_flux_filename, elem_id, _neutron_flux_tally_id);
 
-    /// Output how many elements have been checked
-    _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
-             << std::endl;
+      /// Output how many elements have been checked
+      _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
+               << std::endl;
 
-    std::vector<double> photon_spectra(_num_photon_bins, 0);
+      /// If there is flux in the element, run FISPACT
+      if (isFlux(neutron_flux)) {
+        /// Here we are assuming the input mesh is in centimeters
+        double element_volume = element->volume();
 
-    /// Check if there is any neutron flux in current element
-    bool is_flux = isFlux(neutron_flux);
+        /// Get element material definition
+        const FISPACTMaterial &mat = getElementMaterial(elem_id);
 
-    /// If there is flux in the element, run FISPACT
-    if (is_flux) {
-      /// Here we are assuming the input mesh is in centimeters
-      double element_volume = element->volume();
+        setFispactInputData(_fp_monitor, mat, neutron_flux, element_volume,
+                            fispact_input);
+        /// Run FISPACT
+        fp::Process(fispact_input, _fp_nuclear_data, fispact_output,
+                    _fp_monitor, process_callback);
 
-      /// Get element material definition
-      const FISPACTMaterial &mat = getElementMaterial(elem_id);
+        /// If photon bins aren't set yet, set them
+        if (_photon_bins.empty()) {
+          setPhotonBins(fispact_output);
+        }
 
-      setFispactInputData(_fp_monitor, mat, neutron_flux, element_volume,
-                          fispact_input);
-      /// Run FISPACT
-      fp::Process(fispact_input, _fp_nuclear_data, fispact_output, _fp_monitor,
-                  process_callback);
+        /// Vector to store photon energy spectra in photons/cc-s
+        std::vector<double> element_photon_energy_spectrum(_num_photon_bins, 0);
 
-      /// If photon bins aren't set yet, set them
-      if (_photon_bins.empty()) {
-        setPhotonBins(fispact_output);
+        /// Loop over number of inventories to get all data for current element
+        for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
+
+          convertGammaEvToCount(
+              fispact_input, fispact_output.getGammaSpectrumBins(inv_index + 1),
+              element_photon_energy_spectrum);
+
+          _photon_energy_spectra.insert(
+              _photon_energy_spectra.begin() +
+                  photonEnergySpectraIdx(inv_index, elem_id),
+              element_photon_energy_spectrum.begin(),
+              element_photon_energy_spectrum.end());
+
+          /**
+           * Calculate photon source strength of this element and insert it into
+           * _element_strengths
+           */
+          insertElementStrength(inv_index, element,
+                                element_photon_energy_spectrum);
+        }
       }
+    }
+    /// Calculate _local_domain_strength
+    calculateLocalDomainStrength();
 
-      convertGammaEvToCount(fispact_input,
-                            fispact_output.getGammaSpectrumBins(1),
-                            photon_spectra);
+    if (_write_photon_flux) {
+      const std::vector<double> &inv_times =
+          getUserObject<FispactSchedule>(_schedule_uo_name)
+              .getCumulativeTimes();
+      writePhotonFlux(_photon_flux_filename, inv_times);
     }
 
-    _photon_fluxes.insert(
-        std::pair<int, std::vector<double>>(elem_id, photon_spectra));
-    /**
-     * Calculate photon source strength of this element and insert it into
-     * _element_strengths map
-     */
-    insertElementStrength(element, _photon_fluxes.at(elem_id));
+    fp::GlobalFinalise(_fp_monitor);
 
-    /// Add calculated element strength to _local_domain_strength
-    updateLocalDomainStrength(element);
+    _solved = true;
   }
-
-  if (_write_photon_flux) {
-    writePhotonFlux(_photon_flux_filename);
-  }
-
-  fp::GlobalFinalise(_fp_monitor);
 }
 
-void FispactProblem::writePhotonFlux(const std::string &filename) {
+void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
+  if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
+
+    if (_comm_photon_flux) {
+      // #ifdef LIBMESH_HAVE_BOOST
+      //
+      //       /// Create vector to store all local domain strengths
+      //       std::vector<double> local_domain_strengths;
+      //
+      //       /// Gather local domain strengths from all processors
+      //       comm().allgather(_local_domain_strength, local_domain_strengths);
+      //
+      //       /// Calculate TotalDomainStrength
+      //       getTotalDomainStrength();
+      //
+      //       /// Create a shared instantiation of the photon sharing class
+      //       PhotonSharingData *photon_sharing_instance =
+      //           _segment.construct<PhotonSharingData>(
+      //               "PhotonSharingData photon_sharing_instance")(
+      //               _segment, _photon_fluxes, _element_strengths,
+      //               _num_photon_bins,
+      //               (int)_mesh.getMesh().n_active_local_elem(),
+      //               _total_domain_strength, _local_domain_strength,
+      //               local_domain_strengths, _photon_bins);
+      // #else
+      //       mooseError("_comm_photon_flux is set to true but libmesh was not
+      //       built "
+      //                  "with BOOST. No communication occuring.");
+      // #endif
+    }
+  }
+}
+
+void FispactProblem::writePhotonFlux(
+    const std::string &filename, const std::vector<double> &inventory_times) {
 /**
  * Do use MPI HDF5 driver, as we are calling H5Dcreate on each rank the same
  * number of times
@@ -307,54 +354,57 @@ void FispactProblem::writePhotonFlux(const std::string &filename) {
   hid_t file_id =
       hdf5_utils::file_open(filename.c_str(), 'w', parallel, comm().get());
 
-  std::string dataset_name = "photon_flux";
-  int ndim = 2;
-  int x_dim = _mesh.getMesh().n_active_elem();
+  for (int inv_id = 0; inv_id < _n_inventories; inv_id++) {
 
-  int y_dim = _num_photon_bins;
-  hsize_t dataspace_dims[ndim];
+    std::string dataset_name =
+        "photon_flux_" + std::to_string(inventory_times[inv_id]);
 
-  /// Set up dimensions for photon flux dataspace
-  dataspace_dims[0] = x_dim;
-  dataspace_dims[1] = y_dim;
+    _console << dataset_name << std::endl;
 
-  hid_t filespace = H5Screate_simple(ndim, dataspace_dims, NULL);
-  hid_t h5_dataset =
-      H5Dcreate(file_id, dataset_name.c_str(), H5T_NATIVE_DOUBLE, filespace,
-                H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-  H5Sclose(filespace);
+    int ndim = 2;
+    int x_dim = _mesh.getMesh().n_active_elem();
+    int y_dim = _num_photon_bins;
 
-  for (auto &element_flux_pair : _photon_fluxes) {
-    /**
-     * CONTEXT: A hyperslab is a section of a hdf5 dataspace, don't be put off
-     * by the fancy name
-     */
+    /// Set up dimensions for photon flux dataspace
+    hsize_t dataspace_dims[ndim];
+    dataspace_dims[0] = x_dim;
+    dataspace_dims[1] = y_dim;
 
-    /// Create hdf5 dataspace to be our memory space for writing
-    hsize_t hyperslab_dims[2] = {1, y_dim};
+    // Create filespace
+    hid_t dataspace = H5Screate_simple(ndim, dataspace_dims, NULL);
+    hid_t h5_dataset =
+        H5Dcreate(file_id, dataset_name.c_str(), H5T_NATIVE_DOUBLE, dataspace,
+                  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Sclose(dataspace);
 
-    /// Retrieve element id from _photon_fluxes map
-    hsize_t element_id = (hsize_t)element_flux_pair.first;
+    for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
-    /**
-     * offset and count are used to select our hyperslab.
-     * Given the dimensions of the dataspace are num_elems * 24, our offset
-     * selection should be the element_id who's flux we wish to write
-     */
-    hsize_t start[2] = {element_id, 0};
+      /// Create hdf5 dataspace to be our memory space for writing
+      hsize_t hyperslab_dims[2] = {1, y_dim};
 
-    /// count specifies the number of entries we wish to write in each dimension
-    hsize_t count[2] = {1, _num_photon_bins};
+      /**
+       * offset and count are used to select our hyperslab.
+       * Given the dimensions of the dataspace are num_elems * 24, our offset
+       * selection should be the element_id who's flux we wish to write
+       */
+      hsize_t start[2] = {element->id(), 0};
 
-    hdf5_utils::write_double_hyperslab(
-        h5_dataset, nullptr, ndim, hyperslab_dims, start, count,
-        element_flux_pair.second.data(), parallel);
+      /// count specifies the number of entries we wish to write in each
+      /// dimension
+      hsize_t count[2] = {1, _num_photon_bins};
+
+      int flux_idx = photonEnergySpectraIdx(inv_id, element->id());
+
+      hdf5_utils::write_double_hyperslab(
+          h5_dataset, nullptr, ndim, hyperslab_dims, start, count,
+          &_photon_energy_spectra[flux_idx], parallel);
+    }
+    /// Close all the HDF5 bits and pieces
+    H5Dclose(h5_dataset);
   }
-  /// Close all the HDF5 bits and pieces
-  H5Dclose(h5_dataset);
 
   /// Write bins to hdf5 file as well
-  writePhotonFluxBins(file_id, parallel);
+  // writePhotonFluxBins(file_id, parallel);
 
   H5Fclose(file_id);
 }
@@ -401,6 +451,11 @@ void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
     }
     _photon_bins[i] *= 1e6;
   }
+
+  // Broadcast to all processors. Prevents issues resulting from all the
+  // elements on one processor having zero flux, and hence _photon_bins never
+  // getting set
+  comm().broadcast(_photon_bins);
 }
 
 std::vector<double>
@@ -650,11 +705,12 @@ void FispactProblem::setNeutronBins() {
 }
 
 void FispactProblem::convertGammaEvToCount(
-    const fp::InputData &input, const std::vector<double> &photon_spectra,
-    std::vector<double> &photons_per_cc_per_s) {
+    const fp::InputData &input,
+    const std::vector<double> &photon_energy_spectra_ev,
+    std::vector<double> &photon_energy_spectra_per_cc_s) {
 
   /// Reserve memory for photons per cc per s vector
-  photons_per_cc_per_s.resize(photon_spectra.size());
+  photon_energy_spectra_per_cc_s.resize(photon_energy_spectra_ev.size());
 
   /// Get inventory density and mass
   double inv_density = input.getDensity();
@@ -662,7 +718,7 @@ void FispactProblem::convertGammaEvToCount(
 
   const std::vector<double> &photon_flux_bins = getPhotonBins();
   /// Convert from MeV/s to per cc per s for each bin
-  for (int i = 0; i < photon_spectra.size(); i++) {
+  for (int i = 0; i < photon_energy_spectra_ev.size(); i++) {
     double bin_energy = photon_flux_bins[i] +
                         ((photon_flux_bins[i + 1] - photon_flux_bins[i]) / 2);
 
@@ -671,9 +727,9 @@ void FispactProblem::convertGammaEvToCount(
      * energy_bin_midpoint))
      */
     double per_cc_per_s =
-        photon_spectra[i] * (inv_density / (inv_mass * bin_energy));
+        photon_energy_spectra_ev[i] * (inv_density / (inv_mass * bin_energy));
 
-    photons_per_cc_per_s[i] = per_cc_per_s;
+    photon_energy_spectra_per_cc_s[i] = per_cc_per_s;
   }
 }
 
@@ -689,28 +745,34 @@ double FispactProblem::calculateElementStrength(
 }
 
 void FispactProblem::insertElementStrength(
-    const libMesh::Elem *element, const std::vector<double> element_flux) {
+    const int inv_index, const libMesh::Elem *element,
+    const std::vector<double> element_flux) {
   double elem_strength = calculateElementStrength(element, element_flux);
 
-  _element_strengths.insert(
-      std::pair<int, double>(element->id(), elem_strength));
+  int idx =
+      (inv_index * _mesh.nActiveLocalElem()) + _local_elem_index[element->id()];
+  _element_strengths.insert(_element_strengths.begin() + idx, elem_strength);
 }
 
-void FispactProblem::updateLocalDomainStrength(const libMesh::Elem *element) {
-  double element_strength;
+void FispactProblem::calculateLocalDomainStrength() {
 
-  /**
-   * Attempt to retrieve element strength from map, otherwise catch exception
-   * and give a useful error
-   */
-  try {
-    element_strength = _element_strengths.at(element->id());
-  } catch (std::out_of_range) {
-    mooseError("Attempted to access element strength for an element ID that "
-               "has not had strength calcalculated");
+  for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
+    for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
+
+      double element_strength;
+
+      /**
+       * Attempt to retrieve element strength from map, otherwise catch
+       * exception and give a useful error
+       */
+      int idx = (inv_index * _mesh.nActiveLocalElem()) +
+                _local_elem_index[element->id()];
+
+      element_strength = _element_strengths.at(idx);
+
+      _local_domain_strength[inv_index] += element_strength;
+    }
   }
-
-  _local_domain_strength += element_strength;
 }
 
 void FispactProblem::getTotalDomainStrength() {

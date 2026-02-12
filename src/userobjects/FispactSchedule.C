@@ -23,6 +23,9 @@ FispactSchedule::FispactSchedule(const InputParameters &parameters)
   // Check vectors passed in are the right size
   mooseAssert(_times.size() == _flux_schedule.size(),
               "The length of the flux_schdule and times must be equal");
+
+  _cumulative_times.reserve(_times.size());
+  std::inclusive_scan(_times.begin(), _times.end(), _cumulative_times.begin());
 }
 
 const std::vector<double> &FispactSchedule::getFluxSchedule() const {
@@ -30,3 +33,7 @@ const std::vector<double> &FispactSchedule::getFluxSchedule() const {
 }
 
 const std::vector<double> &FispactSchedule::getTimes() const { return _times; }
+
+const std::vector<double> &FispactSchedule::getCumulativeTimes() const {
+  return _cumulative_times;
+}

@@ -1,18 +1,16 @@
-#include "FispactSchedule.h"
 #include "FispactScheduleTimes.h"
+#include <numeric>
 
 registerMooseObject("MooseApp", FispactScheduleTimes);
 
 InputParameters FispactScheduleTimes::validParams() {
   InputParameters params = Times::validParams();
+
   params.addClassDescription(
       "Times set from a FispactSchedule UserObject defined in the input file");
 
-  params.addRequiredParam<std::vector<Real>>(
-      "times", "Times to store in the times vector");
-
-  params.addRequiredParam<std::string>(
-      "FispactSchedule",
+  params.addRequiredParam<UserObjectName>(
+      "FispactScheduleName",
       "Name of the FispactSchedule UserObject used to set times");
 
   params.addParam<std::vector<int>>(
@@ -30,22 +28,36 @@ InputParameters FispactScheduleTimes::validParams() {
 }
 
 FispactScheduleTimes::FispactScheduleTimes(const InputParameters &parameters)
-    : Times(parameters) {
+    : Times(parameters),
+      _schedule(getUserObject<FispactSchedule>("FispactScheduleName")),
+      _fispact_times(_schedule.getTimes()) {
 
-  const FispactSchedule &schedule =
-      getUserObject<FispactSchedule>(getParam<std::string>("FispactSchedule"));
+  std::inclusive_scan(_fispact_times.begin(), _fispact_times.end(),
+                      _fispact_times.begin());
+
+  for (auto &time : _fispact_times) {
+    _console << time << std::endl;
+  }
 
   if (isParamValid("FispactScheduleTimeIndices")) {
-    std::vector<int> indices =
+
+    const std::vector<int> &indices =
         getParam<std::vector<int>>("FispactScheduleTimeIndices");
 
-    std::vector<double> schedule_times = schedule.getTimes();
-    for (int index : indices) {
-      _times.push_back(schedule_times[index]);
-    }
-    _times = schedule.getTimes();
-  } else {
+    std::vector<bool> mask(_fispact_times.size(), false);
 
-    _times = schedule.getTimes();
+    for (auto index : indices) {
+      mask[index] = true;
+    }
+
+    auto deletion_iterator = std::remove_if(
+        _fispact_times.begin(), _fispact_times.end(),
+        [&, i = size_t(0)](double) mutable { return !mask[i++]; });
+
+    _fispact_times.erase(deletion_iterator, _fispact_times.end());
+
+    _times = _fispact_times;
+  } else {
+    _times = _fispact_times;
   }
 }
