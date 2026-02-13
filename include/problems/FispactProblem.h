@@ -52,9 +52,12 @@ public:
   static InputParameters validParams();
 
   virtual void initialSetup() override;
+
   virtual void externalSolve() override;
   virtual void syncSolutions(ExternalProblem::Direction direction) override;
   virtual bool converged(unsigned int) override { return true; }
+
+  void timestepSetup() override;
 
 private:
   /**
@@ -349,13 +352,13 @@ private:
   std::vector<double> _photon_bins;
 
   ///
-  int _num_neutron_bins;
+  uint64_t _num_neutron_bins;
 
   ///
-  int _num_photon_bins;
+  uint64_t _num_photon_bins;
 
   /// Number of FISPACT inventories
-  int _n_inventories;
+  uint64_t _n_inventories;
   ///
   std::string _schedule_uo_name;
 
@@ -383,5 +386,5 @@ private:
   std::unordered_map<int, double> _molar_mass_map;
 
   /// Map from global element id to "local element id"
-  std::unordered_map<int, int> _local_elem_index;
+  std::unordered_map<uint64_t, uint64_t> _local_elem_index;
 };

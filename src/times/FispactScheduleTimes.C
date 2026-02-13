@@ -30,14 +30,7 @@ InputParameters FispactScheduleTimes::validParams() {
 FispactScheduleTimes::FispactScheduleTimes(const InputParameters &parameters)
     : Times(parameters),
       _schedule(getUserObject<FispactSchedule>("FispactScheduleName")),
-      _fispact_times(_schedule.getTimes()) {
-
-  std::inclusive_scan(_fispact_times.begin(), _fispact_times.end(),
-                      _fispact_times.begin());
-
-  for (auto &time : _fispact_times) {
-    _console << time << std::endl;
-  }
+      _fispact_times(_schedule.getCumulativeTimes()) {
 
   if (isParamValid("FispactScheduleTimeIndices")) {
 

@@ -12,7 +12,9 @@
 /// Fispact includes
 
 //// PugiXML include
+#include "PhotonSharingData.h"
 #include "fispactutil.hpp"
+#include "libmesh/id_types.h"
 #include "pugixml.hpp"
 
 /// Cpp includes
@@ -219,6 +221,18 @@ void FispactProblem::initialSetup() {
   }
 }
 
+void FispactProblem::timestepSetup() {
+
+  ExternalProblem::timestepSetup();
+
+  if (_comm_photon_flux) {
+    if (timeStep() > 1) {
+
+      _segment.destroy<PhotonSharingData>("photon_sharing_instance");
+    }
+  }
+}
+
 void FispactProblem::externalSolve() {
 
   if (!_solved) {
@@ -307,31 +321,63 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
   if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
 
     if (_comm_photon_flux) {
-      // #ifdef LIBMESH_HAVE_BOOST
-      //
-      //       /// Create vector to store all local domain strengths
-      //       std::vector<double> local_domain_strengths;
-      //
-      //       /// Gather local domain strengths from all processors
-      //       comm().allgather(_local_domain_strength, local_domain_strengths);
-      //
-      //       /// Calculate TotalDomainStrength
-      //       getTotalDomainStrength();
-      //
-      //       /// Create a shared instantiation of the photon sharing class
-      //       PhotonSharingData *photon_sharing_instance =
-      //           _segment.construct<PhotonSharingData>(
-      //               "PhotonSharingData photon_sharing_instance")(
-      //               _segment, _photon_fluxes, _element_strengths,
-      //               _num_photon_bins,
-      //               (int)_mesh.getMesh().n_active_local_elem(),
-      //               _total_domain_strength, _local_domain_strength,
-      //               local_domain_strengths, _photon_bins);
-      // #else
-      //       mooseError("_comm_photon_flux is set to true but libmesh was not
-      //       built "
-      //                  "with BOOST. No communication occuring.");
-      // #endif
+#ifdef LIBMESH_HAVE_BOOST
+
+      /// Find the the inventory index associated to time @"time()"
+      const std::vector<double> &schedule_times =
+          getUserObject<FispactSchedule>(_schedule_uo_name)
+              .getCumulativeTimes();
+
+      auto schedule_iterator =
+          std::find(schedule_times.begin(), schedule_times.end(), time());
+      if (schedule_iterator == schedule_times.end()) {
+        mooseError("Current time " + std::to_string(time()) +
+                   " does not match any entry in the FISPACT schedule. Cannot "
+                   "do interprocess communication");
+      }
+      size_t inventory_idx =
+          std::distance(schedule_times.begin(), schedule_iterator);
+
+      /// Calculate TotalDomainStrength
+      getTotalDomainStrength();
+
+      std::vector<double> inv_photon_spectra = std::vector<double>(
+          _photon_energy_spectra.begin() +
+              (inventory_idx * _num_photon_bins * _mesh.nActiveLocalElem()),
+          _photon_energy_spectra.begin() +
+              (inventory_idx * _num_photon_bins * _mesh.nActiveLocalElem()) +
+              (_mesh.nActiveLocalElem() * _num_photon_bins));
+
+      std::vector<double> inv_element_strengths =
+          std::vector<double>(_element_strengths.begin() +
+                                  (inventory_idx * _mesh.nActiveLocalElem()),
+                              _element_strengths.begin() +
+                                  (inventory_idx * _mesh.nActiveLocalElem()) +
+                                  _mesh.nActiveLocalElem());
+
+      /// Create a shared instantiation of the photon sharing class
+      PhotonSharingData *photon_sharing_instance =
+          _segment.construct<PhotonSharingData>("photon_sharing_instance")(
+              _segment, inv_photon_spectra, inv_element_strengths,
+              _num_photon_bins, _mesh.getMesh().n_active_local_elem(),
+              _total_domain_strength[inventory_idx],
+              _local_domain_strength[inventory_idx], _photon_bins,
+              _local_elem_index);
+#else
+      mooseError("_comm_photon_flux is set to true but libmesh was not
+                 built with BOOST. No communication occuring.");
+#endif
+    }
+  }
+  if (direction == ExternalProblem::Direction::TO_EXTERNAL_APP) {
+    if (_comm_photon_flux) {
+#ifdef LIBMESH_HAVE_BOOST
+
+#else
+
+      mooseError("_comm_photon_flux is set to true but libmesh was not
+                 built with BOOST. No communication occuring.");
+#endif
     }
   }
 }
@@ -359,12 +405,9 @@ void FispactProblem::writePhotonFlux(
     std::string dataset_name =
         "photon_flux_" + std::to_string(inventory_times[inv_id]);
 
-    _console << dataset_name << std::endl;
-
     int ndim = 2;
-    int x_dim = _mesh.getMesh().n_active_elem();
+    unsigned long x_dim = _mesh.getMesh().n_active_elem();
     int y_dim = _num_photon_bins;
-
     /// Set up dimensions for photon flux dataspace
     hsize_t dataspace_dims[ndim];
     dataspace_dims[0] = x_dim;
@@ -380,7 +423,7 @@ void FispactProblem::writePhotonFlux(
     for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
       /// Create hdf5 dataspace to be our memory space for writing
-      hsize_t hyperslab_dims[2] = {1, y_dim};
+      hsize_t hyperslab_dims[2] = {1, static_cast<hsize_t>(y_dim)};
 
       /**
        * offset and count are used to select our hyperslab.
@@ -438,7 +481,7 @@ void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
 void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
 
   // Retrieve gamma spectrum boundaries from first fispact inv step
-  int fispact_step = 1;
+  size_t fispact_step = 1;
   std::vector<double> bounds =
       fispact_output.getGammaSpectrumBoundaries(fispact_step);
 
@@ -783,17 +826,16 @@ void FispactProblem::getTotalDomainStrength() {
 
 int FispactProblem::calculateMemorySize() {
   /// Get number of active local elements
-  int n_local_elem = _mesh.getMesh().n_active_local_elem();
+  dof_id_type n_local_elem = _mesh.getMesh().n_active_local_elem();
 
-  unsigned long photon_flux_map_size =
+  size_t photon_flux_map_size =
       ((_num_photon_bins * sizeof(double)) + sizeof(int)) * n_local_elem;
 
-  unsigned long element_strengths_map_size =
+  size_t element_strengths_map_size =
       (sizeof(int) + sizeof(double)) * n_local_elem;
 
-  unsigned long memory_size = photon_flux_map_size +
-                              element_strengths_map_size + (sizeof(int) * 2) +
-                              (sizeof(double) * 2);
+  size_t memory_size = photon_flux_map_size + element_strengths_map_size +
+                       (sizeof(int) * 2) + (sizeof(double) * 2);
   /**
    * Really naive way of doing this, but currently giving a 20% buffer to
    * account for the memory space required by Boost allocators and such
