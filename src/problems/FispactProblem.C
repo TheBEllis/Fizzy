@@ -277,25 +277,23 @@ void FispactProblem::externalSolve() {
         }
 
         /// Vector to store photon energy spectra in photons/cc-s
-        std::vector<double> element_photon_energy_spectrum(_num_photon_bins, 0);
 
         /// Loop over number of inventories to get all data for current element
         for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
+
+          /// Calculated Fispact inventories start at index 1, 0 is reserved for
+          /// initial concentrations
+          std::vector<double> element_photon_energy_spectrum;
 
           convertGammaEvToCount(
               fispact_input, fispact_output.getGammaSpectrumBins(inv_index + 1),
               element_photon_energy_spectrum);
 
-          _photon_energy_spectra.insert(
-              _photon_energy_spectra.begin() +
-                  photonEnergySpectraIdx(inv_index, elem_id),
-              element_photon_energy_spectrum.begin(),
-              element_photon_energy_spectrum.end());
+          std::copy(element_photon_energy_spectrum.begin(),
+                    element_photon_energy_spectrum.end(),
+                    _photon_energy_spectra.begin() +
+                        photonEnergySpectraIdx(inv_index, elem_id));
 
-          /**
-           * Calculate photon source strength of this element and insert it into
-           * _element_strengths
-           */
           insertElementStrength(inv_index, element,
                                 element_photon_energy_spectrum);
         }
@@ -753,11 +751,7 @@ void FispactProblem::convertGammaEvToCount(
     std::vector<double> &photon_energy_spectra_per_s) {
 
   /// Reserve memory for photons per cc per s vector
-  photon_energy_spectra_per_s.resize(photon_energy_spectra_ev.size());
-
-  /// Get inventory density and mass
-  double inv_density = input.getDensity();
-  double inv_mass = input.getMassTotal();
+  photon_energy_spectra_per_s.resize(photon_energy_spectra_ev.size(), 0);
 
   const std::vector<double> &photon_flux_bins = getPhotonBins();
   /// Convert from MeV/s to per cc per s for each bin
@@ -769,9 +763,8 @@ void FispactProblem::convertGammaEvToCount(
      * per_cc_per_s = MeV/s * (inventory_density/(inventory_mass *
      * energy_bin_midpoint))
      */
-    double per_cc_per_s = photon_energy_spectra_ev[i] * (1 / bin_energy);
-
-    photon_energy_spectra_per_s[i] = per_cc_per_s;
+    photon_energy_spectra_per_s[i] =
+        photon_energy_spectra_ev[i] * (1 / bin_energy);
   }
 }
 
@@ -793,7 +786,8 @@ void FispactProblem::insertElementStrength(
 
   int idx =
       (inv_index * _mesh.nActiveLocalElem()) + _local_elem_index[element->id()];
-  _element_strengths.insert(_element_strengths.begin() + idx, elem_strength);
+
+  _element_strengths[idx] = elem_strength;
 }
 
 void FispactProblem::calculateLocalDomainStrength() {
