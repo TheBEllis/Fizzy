@@ -209,7 +209,7 @@ void FispactProblem::initialSetup() {
   /// Reserve space for element strengths vector
   _element_strengths.resize(_mesh.nActiveLocalElem() * _n_inventories, 0);
 
-  _local_domain_strength.reserve(_n_inventories);
+  _local_domain_strength.resize(_n_inventories, 0);
 
   _total_domain_strength.reserve(_n_inventories);
 
