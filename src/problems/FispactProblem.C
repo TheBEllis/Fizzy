@@ -750,10 +750,10 @@ void FispactProblem::setNeutronBins() {
 void FispactProblem::convertGammaEvToCount(
     const fp::InputData &input,
     const std::vector<double> &photon_energy_spectra_ev,
-    std::vector<double> &photon_energy_spectra_per_cc_s) {
+    std::vector<double> &photon_energy_spectra_per_s) {
 
   /// Reserve memory for photons per cc per s vector
-  photon_energy_spectra_per_cc_s.resize(photon_energy_spectra_ev.size());
+  photon_energy_spectra_per_s.resize(photon_energy_spectra_ev.size());
 
   /// Get inventory density and mass
   double inv_density = input.getDensity();
@@ -769,10 +769,9 @@ void FispactProblem::convertGammaEvToCount(
      * per_cc_per_s = MeV/s * (inventory_density/(inventory_mass *
      * energy_bin_midpoint))
      */
-    double per_cc_per_s =
-        photon_energy_spectra_ev[i] * (inv_density / (inv_mass * bin_energy));
+    double per_cc_per_s = photon_energy_spectra_ev[i] * (1 / bin_energy);
 
-    photon_energy_spectra_per_cc_s[i] = per_cc_per_s;
+    photon_energy_spectra_per_s[i] = per_cc_per_s;
   }
 }
 
@@ -781,7 +780,7 @@ double FispactProblem::calculateElementStrength(
   double element_strength = 0;
 
   for (double flux_bin : element_flux) {
-    element_strength += flux_bin * element->volume();
+    element_strength += flux_bin;
   }
 
   return element_strength;
