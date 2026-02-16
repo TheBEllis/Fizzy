@@ -49,7 +49,7 @@ public:
       std::unordered_map<uint64_t, uint64_t> &local_element_idx_map)
       : _num_photon_bins(num_photon_bins), _num_local_elems(num_local_elems),
         _local_domain_strength(local_domain_strength),
-        _total_domain_strength(total_domain_strength), _communication(true),
+        _total_domain_strength(total_domain_strength), _is_setup(false),
         _vec_alloc(segment.get_segment_manager()),
         _int_int_map_alloc(segment.get_segment_manager()),
         _int_doub_map_alloc(segment.get_segment_manager()),
@@ -79,7 +79,7 @@ public:
   double _local_domain_strength;
   double _total_domain_strength;
 
-  bool _communication;
+  bool _is_setup;
 
   /// Allocators
   ShmemVecAllocator _vec_alloc;
