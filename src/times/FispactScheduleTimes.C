@@ -1,4 +1,5 @@
 #include "FispactScheduleTimes.h"
+#include "MooseError.h"
 #include <numeric>
 
 registerMooseObject("MooseApp", FispactScheduleTimes);
@@ -43,11 +44,15 @@ FispactScheduleTimes::FispactScheduleTimes(const InputParameters &parameters)
       mask[index] = true;
     }
 
-    auto deletion_iterator = std::remove_if(
-        _fispact_times.begin(), _fispact_times.end(),
-        [&, i = size_t(0)](double) mutable { return !mask[i++]; });
+    auto mask_it = mask.begin();
+    _fispact_times.erase(
+        std::remove_if(_fispact_times.begin(), _fispact_times.end(),
+                       [&](double const &) { return !*mask_it++; }),
+        _fispact_times.end());
 
-    _fispact_times.erase(deletion_iterator, _fispact_times.end());
+    for (auto &time : _fispact_times) {
+      _console << time << std::endl;
+    }
 
     _times = _fispact_times;
   } else {
