@@ -249,16 +249,24 @@ void FispactNuclearDataPaths::loadNuclearData(
     nd_reader.setPath(FISPACT_ND_CROSSUNC_KEY, path);
   }
 
+  /// If the user has provided binary xs AND uncompressed xs, prefer the binary
+  /// one
   if (isParamValid("ND_XS_ENDF_KEY")) {
-    /// check path exists
-    std::string path = base_path + getParam<std::string>("ND_XS_ENDF_KEY");
+    if (isParamValid("ND_XS_ENDFB_KEY")) {
+      paramWarning("ND_XS_ENDF_KEY",
+                   "User has provided both compressed xs and uncompressed xs, "
+                   "preferring compressed option.");
+    } else {
+      /// check path exists
+      std::string path = base_path + getParam<std::string>("ND_XS_ENDF_KEY");
 
-    if (!(std::filesystem::exists(path))) {
-      paramError("ND_XS_ENDF_KEY",
-                 path + " is not a valid path! Could not set ");
+      if (!(std::filesystem::exists(path))) {
+        paramError("ND_XS_ENDF_KEY",
+                   path + " is not a valid path! Could not set ");
+      }
+
+      nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, path);
     }
-
-    nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, path);
   }
 
   if (isParamValid("ND_XS_ENDFB_KEY")) {
@@ -269,6 +277,8 @@ void FispactNuclearDataPaths::loadNuclearData(
       paramError("ND_XS_ENDFB_KEY",
                  path + " is not a valid path! Could not set ");
     }
+
+    nd_reader.setUseXSBinary(true);
 
     nd_reader.setPath(FISPACT_ND_XS_ENDFB_KEY, path);
   }
