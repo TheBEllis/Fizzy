@@ -32,6 +32,10 @@ const std::vector<double> &FispactSchedule::getFluxSchedule() const {
   return _flux_schedule;
 }
 
+std::vector<double> FispactSchedule::getFluxSchedule() {
+  return _flux_schedule;
+}
+
 const std::vector<double> &FispactSchedule::getTimes() const { return _times; }
 
 const std::vector<double> &FispactSchedule::getCumulativeTimes() const {

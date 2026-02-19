@@ -166,7 +166,8 @@ private:
   /**
    * Retrieve Fispact radiation schedule from FispactSchedule UserObject
    */
-  void setFispactSchedule(fp::InputData &input) const;
+  void setFispactSchedule(fp::InputData &input, const double &volume,
+                          const double &neutron_flux_sum) const;
 
   /**
    * Converts FISPACT gamma spectra outputs from MeV s^-1 to cm^-3 s^-1

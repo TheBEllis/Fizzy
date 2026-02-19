@@ -662,17 +662,27 @@ void FispactProblem::setFispactInputData(
     input.setFuel(zais, atoms);
   }
 
-  /// Get the fispact input schdule from the user object and set it in the
-  /// FISPACT input
-  setFispactSchedule(input);
+  double neutron_flux_sum =
+      std::reduce(neutron_flux.begin(), neutron_flux.end());
+  setFispactSchedule(input, volume, neutron_flux_sum);
 }
 
-void FispactProblem::setFispactSchedule(fp::InputData &input) const {
+void FispactProblem::setFispactSchedule(fp::InputData &input,
+                                        const double &volume,
+                                        const double &neutron_flux_sum) const {
 
   FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
-  const std::vector<double> &flux_schedule = schedule.getFluxSchedule();
+  std::vector<double> flux_schedule = schedule.getFluxSchedule();
   const std::vector<double> &times = schedule.getTimes();
+
+  /// Need to scale input flux amplitude by the total neutron flux in this
+  /// element/ volume
+  for (auto &flux_amplitude : flux_schedule) {
+
+    flux_amplitude *= neutron_flux_sum / volume;
+  }
+
   input.setSchedule(times, flux_schedule);
 }
 

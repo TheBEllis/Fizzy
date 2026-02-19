@@ -13,6 +13,7 @@ public:
   virtual void execute() {}
 
   const std::vector<double> &getFluxSchedule() const;
+  std::vector<double> getFluxSchedule();
   const std::vector<double> &getTimes() const;
   const std::vector<double> &getCumulativeTimes() const;
 
