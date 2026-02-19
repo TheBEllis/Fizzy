@@ -119,6 +119,9 @@ InputParameters FispactProblem::validParams() {
       "conversion_type", MooseEnum("LETHARGY ENERGY", "LETHARGY"),
       "Setting to determine whether to convert by lethargy or energy");
 
+  params.addParam<double>("output_inventory_time",
+                          "When using the Steady executioner, which inventory "
+                          "step should be placed in interprocess data");
   return params;
 }
 
@@ -146,9 +149,10 @@ FispactProblem::FispactProblem(const InputParameters &params)
    */
   if (_materials_from_xml) {
     if (!isParamSetByUser("materials_xml_file")) {
-      mooseWarning("read_materials_from_xml is set to true, but "
+      paramWarning("materials_xml_file",
+                   "read_materials_from_xml is set to true, but "
                    "materials_xml_file is not set! Defaulting to " +
-                   _materials_xml_file);
+                       _materials_xml_file);
     }
     /// Populate _mat_definitions with materials from openmc xml
     read_material_xml_data();
@@ -159,9 +163,10 @@ FispactProblem::FispactProblem(const InputParameters &params)
    * filename, if not use default
    */
   if (_write_photon_flux && !isParamSetByUser("photon_flux_filename")) {
-    _console << "write_photon_flux is set to true but photon_flux_filename is "
-                "not set! Photon flux filename defaulting to " +
-                    _photon_flux_filename;
+    paramWarning("write_photon_flux",
+                 "write_photon_flux is set to true but photon_flux_filename is "
+                 "not set! Photon flux filename defaulting to " +
+                     _photon_flux_filename);
   }
 
   /// Check a corresponding material exists for all mesh blocks
@@ -192,6 +197,17 @@ FispactProblem::FispactProblem(const InputParameters &params)
     mooseError("_comm_photon_flux is set to true but libmesh was not built "
                "with BOOST. No communication occuring.");
 #endif
+
+    if (!isParamSetByUser("output_inventory_time") && !isTransient()) {
+      paramError("output_inventory_time",
+                 "Parameter not set! When using a Steady executioner and "
+                 "comm_photon_flux, user "
+                 "must provide the inventory time to be communicated.");
+    } else if (isParamSetByUser("output_inventory_time") && isTransient()) {
+      paramWarning("output_inventory_time",
+                   "Parameter is set, but executioner is Transient. Ignoring "
+                   "parameter.");
+    }
   }
 }
 
@@ -278,14 +294,15 @@ void FispactProblem::externalSolve() {
           setPhotonBins(fispact_output);
         }
 
-        /// Loop over number of inventories to get all data for current element
+        /// Loop over number of inventories to get all data for current
+        /// element
         for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
 
           /// Vector to store photon energy spectra in photons/cc-s
           std::vector<double> element_photon_energy_spectrum;
 
-          /// Calculated Fispact inventories start at index 1, 0 is reserved for
-          /// initial concentrations
+          /// Calculated Fispact inventories start at index 1, 0 is reserved
+          /// for initial concentrations
           convertGammaEvToCount(
               fispact_input, fispact_output.getGammaSpectrumBins(inv_index + 1),
               element_photon_energy_spectrum);
@@ -321,20 +338,37 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
     if (_comm_photon_flux) {
 #ifdef LIBMESH_HAVE_BOOST
 
-      /// Find the the inventory index associated to time @"time()"
+      /// Find the the inventory index associated to time "time()"
       const std::vector<double> &schedule_times =
           getUserObject<FispactSchedule>(_schedule_uo_name)
               .getCumulativeTimes();
 
-      auto schedule_iterator =
-          std::find(schedule_times.begin(), schedule_times.end(), time());
-      if (schedule_iterator == schedule_times.end()) {
-        mooseError("Current time " + std::to_string(time()) +
-                   " does not match any entry in the FISPACT schedule. Cannot "
-                   "do interprocess communication");
+      size_t inventory_idx{0};
+
+      if (!isTransient()) {
+        double inventory_time = getParam<double>("output_inventory_time");
+        auto schedule_iterator = std::find(
+            schedule_times.begin(), schedule_times.end(), inventory_time);
+        if (schedule_iterator == schedule_times.end()) {
+          mooseError(
+              "Current time " + std::to_string(time()) +
+              " does not match any entry in the FISPACT schedule. Cannot "
+              "do interprocess communication");
+        }
+        inventory_idx =
+            std::distance(schedule_times.begin(), schedule_iterator);
+      } else {
+        auto schedule_iterator =
+            std::find(schedule_times.begin(), schedule_times.end(), time());
+        if (schedule_iterator == schedule_times.end()) {
+          mooseError(
+              "Current time " + std::to_string(time()) +
+              " does not match any entry in the FISPACT schedule. Cannot "
+              "do interprocess communication");
+        }
+        inventory_idx =
+            std::distance(schedule_times.begin(), schedule_iterator);
       }
-      size_t inventory_idx =
-          std::distance(schedule_times.begin(), schedule_iterator);
 
       /// Calculate TotalDomainStrength
       getTotalDomainStrength();
@@ -558,8 +592,8 @@ FispactProblem::readElementNeutronFlux(const std::string &filename,
   hdf5_utils::file_close(file_id);
 
   /**
-   * Divide every value in neutron flux results vector by n_realizations to get
-   * the mean value
+   * Divide every value in neutron flux results vector by n_realizations to
+   * get the mean value
    */
   for (auto &bin : neutron_flux_results) {
     bin /= n_realizations;
@@ -641,8 +675,9 @@ void FispactProblem::setFispactInputData(
     std::vector<double> atoms;
     atoms.reserve(nuclideFractionMap.size());
 
-    /// For all key (isotope name) value (mass_fraction) pairs in map, calculate
-    /// the number of atoms pertaining to each isotope and append to input fuel
+    /// For all key (isotope name) value (mass_fraction) pairs in map,
+    /// calculate the number of atoms pertaining to each isotope and append to
+    /// input fuel
     for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
 
       double zai_mass = total_mass * mass_fraction;
@@ -703,9 +738,9 @@ FispactProblem::getElementMaterial(dof_id_type &elem_id) {
     }
   }
 
-  // FISPACT material pertaining to this block. If there ismore than one object,
-  // then two FISPACTMaterials are assigned to this block, and that makes no
-  // blimmin sense does it
+  // FISPACT material pertaining to this block. If there ismore than one
+  // object, then two FISPACTMaterials are assigned to this block, and that
+  // makes no blimmin sense does it
   if (objs.empty()) {
     mooseError("Unable to find FISPACTMaterial object on block " +
                std::to_string(elem->subdomain_id()));
