@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<materials>
+  <material id="1" name="steel" temperature="296">
+    <density units="g/cm3" value="8.0"/>
+    <nuclide ao="1.5132548e-05" name="C13"/>
+    <nuclide ao="0.00135086745" name="C12"/>
+    <nuclide ao="0.01991" name="Mn55"/>
+    <nuclide ao="0.000795" name="P31"/>
+    <nuclide ao="2.14834688e-05" name="S34"/>
+    <nuclide ao="0.000486608589" name="S32"/>
+    <nuclide ao="3.8332928e-06" name="S33"/>
+    <nuclide ao="7.46496e-08" name="S36"/>
+    <nuclide ao="0.0179598856" name="Si28"/>
+    <nuclide ao="0.000911951747" name="Si29"/>
+    <nuclide ao="0.000601162667" name="Si30"/>
+    <nuclide ao="0.0189874635" name="Cr53"/>
+    <nuclide ao="0.00868335215" name="Cr50"/>
+    <nuclide ao="0.167449803" name="Cr52"/>
+    <nuclide ao="0.00472638155" name="Cr54"/>
+    <nuclide ao="0.0033866271" name="Ni62"/>
+    <nuclide ao="0.0244346846" name="Ni60"/>
+    <nuclide ao="0.00086247408" name="Ni64"/>
+    <nuclide ao="0.0634340554" name="Ni58"/>
+    <nuclide ao="0.00106215882" name="Ni61"/>
+    <nuclide ao="0.610087944" name="Fe56"/>
+    <nuclide ao="0.00187506594" name="Fe58"/>
+    <nuclide ao="0.0140895912" name="Fe57"/>
+    <nuclide ao="0.0388643986" name="Fe54"/>
+  </material>
+</materials>
