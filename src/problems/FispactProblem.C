@@ -195,8 +195,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
   }
 }
 
-void write_callback(int zai, int i, int t) {}
-
 void FispactProblem::initialSetup() {
   ExternalProblem::initialSetup();
 
@@ -205,11 +203,6 @@ void FispactProblem::initialSetup() {
 
   /// Set neutron bin type
   setInputNeutronBins();
-  // fp::io::ToBinaryFile(_fp_nuclear_data, _fp_monitor, "endfb80-n-c.bin",
-  //                      &write_callback);
-  //
-  // _console << "xs group: " << _fp_nuclear_data.getReactionXS(0, 0).size()
-  //          << std::endl;
 
   /// Get n FISPACT Schedule Times
   FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
