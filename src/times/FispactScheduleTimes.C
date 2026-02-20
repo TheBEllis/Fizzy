@@ -50,10 +50,6 @@ FispactScheduleTimes::FispactScheduleTimes(const InputParameters &parameters)
                        [&](double const &) { return !*mask_it++; }),
         _fispact_times.end());
 
-    for (auto &time : _fispact_times) {
-      _console << time << std::endl;
-    }
-
     _times = _fispact_times;
   } else {
     _times = _fispact_times;

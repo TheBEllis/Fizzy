@@ -223,7 +223,6 @@ void FispactProblem::initialSetup() {
   /// Check user has passed output_inventory_time, if problem is Steady and
   /// they wish to use distributed sampling
   if (_comm_photon_flux) {
-    _console << isTransient() << std::endl;
     if (!isParamSetByUser("output_inventory_time") && !isTransient()) {
       paramError("output_inventory_time",
                  "Parameter not set! When using a Steady executioner and "
@@ -354,7 +353,6 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
 
       if (!isTransient()) {
         double inventory_time = getParam<double>("output_inventory_time");
-        _console << "Output Inv time: " << inventory_time << std::endl;
         auto schedule_iterator = std::find(
             schedule_times.begin(), schedule_times.end(), inventory_time);
         if (schedule_iterator == schedule_times.end()) {
@@ -380,8 +378,6 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
         inventory_idx =
             std::distance(schedule_times.begin(), schedule_iterator);
       }
-
-      _console << "Inv index: " << inventory_idx << std::endl;
 
       /// Calculate TotalDomainStrength
       getTotalDomainStrength();
@@ -829,7 +825,6 @@ void FispactProblem::read_material_xml_data() {
     }
 
     if (all_ao) {
-      _console << "all ao" << std::endl;
       double sum_fraction_time_atomic_weight = 0;
 
       std::vector<double> molar_masses;
@@ -837,7 +832,6 @@ void FispactProblem::read_material_xml_data() {
       for (int i = 0; i < nuclides.size(); i++) {
         int zai = fp::util::GetZai(_fp_monitor, nuclides.at(i));
         molar_masses.push_back(_molar_mass_map.at(zai));
-        _console << nuclide_fractions.at(i) << std::endl;
         sum_fraction_time_atomic_weight +=
             molar_masses.back() * abs(nuclide_fractions.at(i));
       }
@@ -1038,7 +1032,6 @@ void FispactProblem::loadMolarMasses() {
 
 void FispactProblem::checkForGroupStructureConsistency() {
   size_t n_nd_neutron_bins = _fp_nuclear_data.getReactionXS(0, 0).size();
-  _console << "nuclear data xs: " << n_nd_neutron_bins << std::endl;
 
   if (_n_input_neutron_bins != n_nd_neutron_bins) {
     _neutron_bins = _neutron_group_map[n_nd_neutron_bins];
