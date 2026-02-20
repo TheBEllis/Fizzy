@@ -1,4 +1,6 @@
 #include "ExternalProblem.h"
+#include "FEProblemBase.h"
+#include "FISPACTMaterial.h"
 #include "FispactProblem.h"
 
 #include "../../include/userobjects/FispactNuclearDataPaths.C"
@@ -6,6 +8,7 @@
 #include "FispactSchedule.h"
 
 #include "HDF5Utils.h"
+#include "InputParameters.h"
 #include "MooseEnum.h"
 #include "MooseError.h"
 #include "MooseTypes.h"
@@ -144,21 +147,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _molar_mass_data_filename(getParam<FileName>("molar_mass_data")) {
 
   /**
-   * Load materials from xml file if read_materials_from_xml is set to true,
-   * and a materials xml filename has been passed
-   */
-  if (_materials_from_xml) {
-    if (!isParamSetByUser("materials_xml_file")) {
-      paramWarning("materials_xml_file",
-                   "read_materials_from_xml is set to true, but "
-                   "materials_xml_file is not set! Defaulting to " +
-                       _materials_xml_file);
-    }
-    /// Populate _mat_definitions with materials from openmc xml
-    read_material_xml_data();
-  }
-
-  /**
    * If write_photon_flux was set to true then check that user input a
    * filename, if not use default
    */
@@ -175,10 +163,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
   /// Initialise FISPACT
   fp::GlobalInitialise(_fp_monitor);
 
-  /// Load molar mass data
-  loadMolarMasses();
-
-  /// Read neutron flux from h5 file
   if (_comm_photon_flux) {
 
 #ifdef LIBMESH_HAVE_BOOST
@@ -197,17 +181,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
     mooseError("_comm_photon_flux is set to true but libmesh was not built "
                "with BOOST. No communication occuring.");
 #endif
-
-    if (!isParamSetByUser("output_inventory_time") && !isTransient()) {
-      paramError("output_inventory_time",
-                 "Parameter not set! When using a Steady executioner and "
-                 "comm_photon_flux, user "
-                 "must provide the inventory time to be communicated.");
-    } else if (isParamSetByUser("output_inventory_time") && isTransient()) {
-      paramWarning("output_inventory_time",
-                   "Parameter is set, but executioner is Transient. Ignoring "
-                   "parameter.");
-    }
   }
 }
 
@@ -216,6 +189,9 @@ void FispactProblem::initialSetup() {
 
   /// Set nuclear data paths
   setNuclearData(_fp_nuclear_data_uo);
+
+  /// Load molar mass data
+  loadMolarMasses();
 
   /// Set neutron bin type
   setInputNeutronBins();
@@ -242,6 +218,37 @@ void FispactProblem::initialSetup() {
   for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
     _local_elem_index.insert(
         std::pair<int, int>(element->id(), local_elem_idx++));
+  }
+
+  /// Check user has passed output_inventory_time, if problem is Steady and
+  /// they wish to use distributed sampling
+  if (_comm_photon_flux) {
+    _console << isTransient() << std::endl;
+    if (!isParamSetByUser("output_inventory_time") && !isTransient()) {
+      paramError("output_inventory_time",
+                 "Parameter not set! When using a Steady executioner and "
+                 "comm_photon_flux, user "
+                 "must provide the inventory time to be communicated.");
+    } else if (isParamSetByUser("output_inventory_time") && isTransient()) {
+      paramWarning("output_inventory_time",
+                   "Parameter is set, but executioner is Transient. Ignoring "
+                   "parameter.");
+    }
+  }
+
+  /**
+   * Load materials from xml file if read_materials_from_xml is set to true,
+   * and a materials xml filename has been passed
+   */
+  if (_materials_from_xml) {
+    if (!isParamSetByUser("materials_xml_file")) {
+      paramWarning("materials_xml_file",
+                   "read_materials_from_xml is set to true, but "
+                   "materials_xml_file is not set! Defaulting to " +
+                       _materials_xml_file);
+    }
+    /// Populate _mat_definitions with materials from openmc xml
+    read_material_xml_data();
   }
 }
 
@@ -347,6 +354,7 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
 
       if (!isTransient()) {
         double inventory_time = getParam<double>("output_inventory_time");
+        _console << "Output Inv time: " << inventory_time << std::endl;
         auto schedule_iterator = std::find(
             schedule_times.begin(), schedule_times.end(), inventory_time);
         if (schedule_iterator == schedule_times.end()) {
@@ -355,6 +363,9 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
               " does not match any entry in the FISPACT schedule. Cannot "
               "do interprocess communication");
         }
+
+        /// + 1 is required due to the inventory at idx 0 being the initial
+        /// inventory before any calculations
         inventory_idx =
             std::distance(schedule_times.begin(), schedule_iterator);
       } else {
@@ -369,6 +380,8 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
         inventory_idx =
             std::distance(schedule_times.begin(), schedule_iterator);
       }
+
+      _console << "Inv index: " << inventory_idx << std::endl;
 
       /// Calculate TotalDomainStrength
       getTotalDomainStrength();
@@ -773,28 +786,87 @@ void FispactProblem::read_material_xml_data() {
     mooseError("No file called " + _materials_xml_file +
                " could be found, exiting.");
   }
+
   for (pugi::xml_node material : doc.child("materials").children()) {
 
+    InputParameters params =
+        _app.getFactory().getValidParams("FISPACTMaterial");
     /// Get material name
     std::string material_name = material.attribute("name").value();
+
     /// Get material density
     double density =
         std::stod(material.child("density").attribute("value").value());
 
-    /// Get atomic composition of material
-    std::vector<std::pair<std::string, double>> atomic_comp;
+    std::string density_units =
+        material.child("density").attribute("units").value();
+
+    std::vector<std::string> nuclides;
+    std::vector<double> nuclide_fractions;
 
     for (pugi::xml_node nuclide : material.children("nuclide")) {
-      std::pair<std::string, double> nuclide_symbol_and_percentage =
-          std::make_pair(std::string(nuclide.attribute("name").value()),
-                         std::stod(nuclide.attribute("ao").value()));
-      atomic_comp.push_back(nuclide_symbol_and_percentage);
+      nuclides.push_back(std::string(nuclide.attribute("name").value()));
+
+      if (nuclide.attribute("wo")) {
+        nuclide_fractions.push_back(std::stod(nuclide.attribute("wo").value()));
+      } else if (nuclide.attribute("ao")) {
+
+        nuclide_fractions.push_back(
+            -std::stod(nuclide.attribute("ao").value()));
+      }
     }
 
-    /// Create material definition
-    MaterialDefinition material_def{material_name, atomic_comp, density};
-    /// Insert material definition into material map
-    _mat_definitions.insert(std::make_pair(material_name, material_def));
+    bool all_wo =
+        std::all_of(nuclide_fractions.begin(), nuclide_fractions.end(),
+                    [](double x) { return x >= 0.0; });
+    bool all_ao =
+        std::all_of(nuclide_fractions.begin(), nuclide_fractions.end(),
+                    [](double x) { return x <= 0.0; });
+
+    if (!(all_wo || all_ao)) {
+      mooseError("Cannot mix atom and weight percents in material. Error when "
+                 "parsing material xml");
+    }
+
+    if (all_ao) {
+      _console << "all ao" << std::endl;
+      double sum_fraction_time_atomic_weight = 0;
+
+      std::vector<double> molar_masses;
+
+      for (int i = 0; i < nuclides.size(); i++) {
+        int zai = fp::util::GetZai(_fp_monitor, nuclides.at(i));
+        molar_masses.push_back(_molar_mass_map.at(zai));
+        _console << nuclide_fractions.at(i) << std::endl;
+        sum_fraction_time_atomic_weight +=
+            molar_masses.back() * abs(nuclide_fractions.at(i));
+      }
+
+      for (int i = 0; i < nuclides.size(); i++) {
+        nuclide_fractions[i] *=
+            -1 * molar_masses.at(i) / sum_fraction_time_atomic_weight;
+      }
+    }
+
+    if (density_units == "kg/m3") {
+      density /= 1000;
+    }
+    // TODO
+    if (density_units == "atom/b-cm") {
+      if (all_ao) {
+      }
+
+      if (all_wo) {
+      }
+    }
+
+    params.set<double>("density") = density;
+    params.set<MooseEnum>("material_type") = "FUEL";
+    params.set<std::vector<SubdomainName>>("block") = {material_name};
+    params.set<std::vector<std::string>>("nuclides") = nuclides;
+    params.set<std::vector<double>>("nuclide_fraction") = nuclide_fractions;
+
+    addUserObject("FISPACTMaterial", material_name, params);
   }
 }
 
