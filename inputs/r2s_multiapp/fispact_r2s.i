@@ -65,7 +65,7 @@
     type = FullSolveMultiApp
     execute_on = timestep_end
     app_type = 'CardinalApp'
-    input_files = '/Projects/fizzy/inputs/r2s_multiapp/photons_input.i'
+    input_files = '/Projects/Fizzy/inputs/r2s_multiapp/photons_input.i'
     library_path = '/Projects/cardinal/lib/'
     library_name = 'libcardinal-opt.la'
   []
