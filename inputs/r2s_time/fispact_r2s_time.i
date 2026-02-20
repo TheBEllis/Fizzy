@@ -40,15 +40,15 @@
   [steel]
     type = FISPACTMaterial
     material_type = FUEL
-    nuclides = "C13 C12 Mn55 P31 S34 S32 S33 S36 Si28 Si29 Si30 Cr53 Cr50 Cr52 Cr54 Ni62 Ni60 Ni64 Ni58 Ni61 Fe56 Fe58 Fe57 Fe54"
-    nuclide_fraction = "1.5132548e-05 0.00135086745 0.01991 0.000795 2.14834688e-05 0.000486608589 3.8332928e-06 7.46496e-08 0.0179598856 0.000911951747 0.000601162667 0.0189874635 0.00868335215 0.167449803 0.00472638155 0.0033866271 0.0244346846 0.00086247408 0.0634340554 0.00106215882 0.610087944 0.00187506594 0.0140895912 0.0388643986"
+    nuclides = "B10 B11 C12 C13 Si28 V50 V51 Cr50 Cr52 Cr53 Cr54 Mn55 Fe54 Fe56 Fe57 Fe58 Co59 Ni58 Ni60 Ni61 Ni62 Ni64 Mo92 Mo94 Mo95 Mo96 Mo97 Mo98 Mo100 Cu63 Cu65"
+    nuclide_fraction = "0.000693 0.002807 0.039520273803427465 0.000479726196572539 0.47 0.0003921925373160739 0.15960780746268394 0.73 14.07 1.6 0.4 1.14 3.95 62.51 1.46 0.2 0.14 7.31 2.79 0.12 0.38 0.1 0.2974760972643644 0.1906159496693566 0.33284984504744625 0.3533051306488447 0.20516502475964524 0.5254922939545649 0.21509565865577795 0.06 0.03"
     block = 1
     density = 8
   []
 
   [endf_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/home/bill/Projects/FispactNuclearData/"
+    base_path = "/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
     #ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
     ND_XS_ENDFB_KEY = "endfb80-n.bin"
@@ -60,7 +60,7 @@
 
   [cendl_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/home/bill/Projects/FispactNuclearData/"
+    base_path = "/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "decay2020/decay_2020_index.txt"
     #ND_XS_ENDF_KEY = "CENDL32data/gendf-1102"
     ND_XS_ENDFB_KEY = "CENDL-n.bin"
@@ -72,7 +72,7 @@
   []
   [tendl_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/home/bill/Projects/FispactNuclearData/"
+    base_path = "/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "TENDL2017data/tendl17_decay12_index"
     #ND_XS_ENDF_KEY = "TENDL2017data/tal2017-n/gxs-709"
     ND_XS_ENDFB_KEY = "TENDL-n.bin"
@@ -89,8 +89,8 @@
     type = TransientMultiApp
     execute_on = timestep_end
     app_type = 'CardinalApp'
-    input_files = '/home/bill/Projects/fizzy/inputs/r2s_time/photons_input.i'
-    library_path = '/home/bill/Projects/cardinal/lib/'
+    input_files = '/Projects/fizzy/inputs/r2s_time/photons_input.i'
+    library_path = '/Projects/cardinal/lib/'
     library_name = 'libcardinal-opt.la'
   []
 []
@@ -108,7 +108,7 @@
   [FizzyTimes]
     type = FispactScheduleTimes
     FispactScheduleName = Schedule
-    FispactScheduleTimeIndices = '0 1'
+#    FispactScheduleTimeIndices = '0 1'
 
   []
 []

@@ -7,11 +7,10 @@
 
 [Problem]
   type = FispactProblem 
-  fispact_nuclear_data_path = '/home/bill/Projects/FISPACT/nuclear_data/'
 
-  neutron_flux_file = './../statepoint_neutrons.10.h5'
-  neutron_flux_tally_id = 1
-  neutron_bin_type = 'G1102'
+  neutron_flux_file = './statepoint_neutrons.10.h5'
+  neutron_flux_tally_id = 2
+  neutron_bin_structure = 1102
 
   write_photon_flux = True
   photon_flux_filename = 'photon_spectra_out'
@@ -19,6 +18,7 @@
   molar_mass_data = '../../molar_masses.h5'
 
   fispact_schedule_uo = 'Schedule'
+  fispact_nuclear_data_uo = 'endf_nuclear_data'
 []
 
 [UserObjects]
@@ -36,7 +36,17 @@
     block = 'steel' 
     density = 5
   []
-
+  [endf_nuclear_data]
+    type = FispactNuclearDataPaths
+    base_path = "/Projects/FispactNuclearData/"
+    ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
+    #ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
+    ND_XS_ENDFB_KEY = "endfb80-n.bin"
+    ND_FY_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80nfy"
+    ND_SF_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80sfy"
+    ND_DK_ENDF_KEY = "ENDFB80data/decay"
+    ND_ABSORP_KEY = "decay/abs_2012"
+  []
 []
 
 [Executioner]
