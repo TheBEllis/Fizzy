@@ -37,16 +37,6 @@ namespace bi = boost::interprocess;
 
 class FispactProblem : public ExternalProblem {
 
-  /**
-   * Struct to store FISPACT Material definitions
-   *
-   */
-  struct MaterialDefinition {
-    std::string _mat_name;
-    std::vector<std::pair<std::string, double>> _mat_atomic_composition;
-    double _mat_density;
-  };
-
 public:
   FispactProblem(const InputParameters &params);
 
@@ -343,9 +333,6 @@ private:
 
   /// Filename of xml file to read materials from
   std::string _materials_xml_file;
-
-  /// Mappings from material name to material definitions
-  std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
 
   ///
   const FISPACTMaterial &getElementMaterial(dof_id_type &elem_id);
