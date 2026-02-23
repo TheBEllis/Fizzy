@@ -6,6 +6,8 @@
 
 #include "HDF5Utils.h"
 
+#include "PhotonSpectra.h"
+
 // Fispact includes
 #include "fispactcompute.hpp"
 #include "fispactmonitor.hpp"
@@ -298,6 +300,8 @@ private:
   /// -- Interprocess bits --
 #ifdef LIBMESH_HAVE_BOOST
   bi::managed_shared_memory _segment;
+
+  PhotonSharingData *_photon_sharing_instance;
 #endif
 
   /// FISPACT monitor
@@ -311,7 +315,9 @@ private:
 
   /// FISPACT Photon fluxes
   /// Indexed by time major, element id minor
-  std::vector<double> _photon_energy_spectra;
+  // std::vector<double> _photon_energy_spectra;
+
+  std::unique_ptr<PhotonSpectra> _photon_energy_spectra;
 
   /// Vector to store all local element strengths over all inventory times
   /// Indexed by time major, element id minor

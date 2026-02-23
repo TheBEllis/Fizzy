@@ -203,8 +203,11 @@ void FispactProblem::initialSetup() {
   _n_inventories = schedule.getTimes().size();
 
   /// Reserve space in our solution vector
-  _photon_energy_spectra.resize(
-      _mesh.nActiveLocalElem() * _n_inventories * _n_photon_bins, 0);
+  // _photon_energy_spectra.resize(
+  //     _mesh.nActiveLocalElem() * _n_inventories * _n_photon_bins, 0);
+
+  _photon_energy_spectra = std::make_unique<PhotonSpectra>(
+      _n_inventories, _mesh.nActiveLocalElem(), _n_photon_bins);
 
   /// Reserve space for element strengths vector
   _element_strengths.resize(_mesh.nActiveLocalElem() * _n_inventories, 0);
@@ -255,12 +258,12 @@ void FispactProblem::timestepSetup() {
 
   ExternalProblem::timestepSetup();
 
-  if (_comm_photon_flux) {
-    if (timeStep() > 1) {
-
-      _segment.destroy<PhotonSharingData>("photon_sharing_instance");
-    }
-  }
+  // if (_comm_photon_flux) {
+  //   if (timeStep() > 1) {
+  //
+  //     _segment.destroy<PhotonSharingData>("photon_sharing_instance");
+  //   }
+  // }
 }
 
 void FispactProblem::externalSolve() {
@@ -275,20 +278,20 @@ void FispactProblem::externalSolve() {
     for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
       /// Get element id
-      dof_id_type elem_id = element->id();
+      dof_id_type global_elem_id = element->id();
 
       _console << std::endl
-               << "Elem ID: " << std::to_string(elem_id) << std::endl;
+               << "Elem ID: " << std::to_string(global_elem_id) << std::endl;
 
       std::vector<double> neutron_flux = readElementNeutronFlux(
-          _neutron_flux_filename, elem_id, _neutron_flux_tally_id);
+          _neutron_flux_filename, global_elem_id, _neutron_flux_tally_id);
 
       /// Output how many elements have been checked
       _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
                << std::endl;
 
       if (isFlux(neutron_flux)) {
-        const FISPACTMaterial &mat = getElementMaterial(elem_id);
+        const FISPACTMaterial &mat = getElementMaterial(global_elem_id);
 
         setFispactInputData(_fp_monitor, mat, neutron_flux, element->volume(),
                             fispact_input);
@@ -315,8 +318,8 @@ void FispactProblem::externalSolve() {
 
           std::copy(element_photon_energy_spectrum.begin(),
                     element_photon_energy_spectrum.end(),
-                    _photon_energy_spectra.begin() +
-                        photonEnergySpectraIdx(inv_index, elem_id));
+                    _photon_energy_spectra->spectrum_begin(
+                        inv_index, _local_elem_index[global_elem_id]));
 
           insertElementStrength(inv_index, element,
                                 element_photon_energy_spectrum);
@@ -362,8 +365,6 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
               "do interprocess communication");
         }
 
-        /// + 1 is required due to the inventory at idx 0 being the initial
-        /// inventory before any calculations
         inventory_idx =
             std::distance(schedule_times.begin(), schedule_iterator);
       } else {
@@ -382,44 +383,44 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
       /// Calculate TotalDomainStrength
       getTotalDomainStrength();
 
-      std::vector<double> inv_photon_spectra = std::vector<double>(
-          _photon_energy_spectra.begin() +
-              (inventory_idx * _n_photon_bins * _mesh.nActiveLocalElem()),
-          _photon_energy_spectra.begin() +
-              (inventory_idx * _n_photon_bins * _mesh.nActiveLocalElem()) +
-              (_mesh.nActiveLocalElem() * _n_photon_bins));
+      /// Create a shared instantiation of the photon sharing class, the init
+      /// data that are common across all timesteps
+      if (timeStep() == 1) {
+        _photon_sharing_instance = _segment.construct<PhotonSharingData>(
+            "photon_sharing_instance")(_segment);
+        _photon_sharing_instance->setPhotonBins(_photon_bins);
+        _photon_sharing_instance->setNumPhotonBins(_n_photon_bins);
+        _photon_sharing_instance->setNumLocalElems(_mesh.nActiveLocalElem());
+        _photon_sharing_instance->setLocalElemIdMap(_local_elem_index);
+      }
 
-      std::vector<double> inv_element_strengths =
-          std::vector<double>(_element_strengths.begin() +
-                                  (inventory_idx * _mesh.nActiveLocalElem()),
-                              _element_strengths.begin() +
-                                  (inventory_idx * _mesh.nActiveLocalElem()) +
-                                  _mesh.nActiveLocalElem());
+      // Setup data that varies per timestep
+      _photon_sharing_instance->_is_setup = false;
 
-      /// Create a shared instantiation of the photon sharing class
-      PhotonSharingData *photon_sharing_instance =
-          _segment.construct<PhotonSharingData>("photon_sharing_instance")(
-              _segment, inv_photon_spectra, inv_element_strengths,
-              _n_photon_bins, _mesh.getMesh().n_active_local_elem(),
-              _total_domain_strength[inventory_idx],
-              _local_domain_strength[inventory_idx], _photon_bins,
-              _local_elem_index);
+      _photon_sharing_instance->setPhotonSpectra(
+          _photon_energy_spectra->time_begin(inventory_idx),
+          _photon_energy_spectra->time_end(inventory_idx));
+
+      _photon_sharing_instance->setElementStrengths(
+          _element_strengths.begin() +
+              (inventory_idx * _mesh.nActiveLocalElem()),
+          _element_strengths.begin() +
+              (inventory_idx * _mesh.nActiveLocalElem()) +
+              _mesh.nActiveLocalElem());
+
+      _photon_sharing_instance->setLocalDomainStrength(
+          _local_domain_strength[inventory_idx]);
+      _photon_sharing_instance->setTotalDomainStrength(
+          _total_domain_strength[inventory_idx]);
+
 #else
       mooseError("_comm_photon_flux is set to true but libmesh was not
                  built with BOOST. No communication occuring.");
 #endif
     }
   }
+
   if (direction == ExternalProblem::Direction::TO_EXTERNAL_APP) {
-    if (_comm_photon_flux) {
-#ifdef LIBMESH_HAVE_BOOST
-
-#else
-
-      mooseError("_comm_photon_flux is set to true but libmesh was not
-                 built with BOOST. No communication occuring.");
-#endif
-    }
   }
 }
 
@@ -477,11 +478,11 @@ void FispactProblem::writePhotonFlux(
       /// dimension
       hsize_t count[2] = {1, _n_photon_bins};
 
-      int flux_idx = photonEnergySpectraIdx(inv_id, element->id());
-
       hdf5_utils::write_double_hyperslab(
           h5_dataset, nullptr, ndim, hyperslab_dims, start, count,
-          &_photon_energy_spectra[flux_idx], parallel);
+          &*_photon_energy_spectra->spectrum_begin(
+              inv_id, _local_elem_index[element->id()]),
+          parallel);
     }
     /// Close all the HDF5 bits and pieces
     H5Dclose(h5_dataset);
