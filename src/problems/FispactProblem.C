@@ -714,7 +714,7 @@ void FispactProblem::setFispactSchedule(fp::InputData &input,
 
   FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
-  std::vector<double> flux_schedule = schedule.getFluxSchedule();
+  std::vector<double> flux_schedule = schedule.getFluxAmplitude();
   const std::vector<double> &times = schedule.getTimes();
 
   /// Need to scale input flux amplitude by the total neutron flux in this
