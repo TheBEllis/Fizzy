@@ -329,6 +329,14 @@ void FispactProblem::externalSolve() {
     calculateLocalDomainStrength();
 
     if (_write_photon_flux) {
+	
+      /// There is a possibility that a given rank had elements, all with zero flux.
+      /// Because _photon_bins gets set from the fispact_output object, if a calculation never takes place then it never gets set! So this makes sure even those ranks have valid _photon_bins
+      int broadcast_rank = !_photon_bins.empty() ? comm().rank(): -1;
+      comm().max(broadcast_rank);
+      comm().broadcast(_photon_bins, broadcast_rank);
+      _console << broadcast_rank << std::endl;
+
       const std::vector<double> &inv_times =
           getUserObject<FispactSchedule>(_schedule_uo_name)
               .getCumulativeTimes();
@@ -536,11 +544,6 @@ void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
     }
     _photon_bins[i] *= 1e6;
   }
-
-  // Broadcast to all processors. Prevents issues resulting from all the
-  // elements on one processor having zero flux, and hence _photon_bins never
-  // getting set
-  comm().broadcast(_photon_bins);
 }
 
 std::vector<double>
