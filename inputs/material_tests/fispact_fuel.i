@@ -8,10 +8,6 @@
 [Problem]
   type = FispactProblem 
 
-  neutron_flux_file = './statepoint_neutrons.10.h5'
-  neutron_flux_tally_id = 2
-  neutron_bin_structure = 1102
-
   write_photon_flux = True
   photon_flux_filename = 'photon_spectra_out'
 
@@ -19,9 +15,19 @@
 
   fispact_schedule_uo = 'Schedule'
   fispact_nuclear_data_uo = 'endf_nuclear_data'
+  fispact_input_flux_uo = 'InputFlux'
 []
 
 [UserObjects]
+
+  [InputFlux]
+    type = OpenMCFluxInput
+    statepoint_filename = './statepoint_neutrons.10.h5'
+    energy_filter_id = 2
+    flux_tally_id = 2
+    wall_loading = 10
+  []
+
   [Schedule]
     type = FispactSchedule
     times = '300 30 30 30 30 30'
@@ -39,7 +45,7 @@
 
   [endf_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/Projects/FispactNuclearData/"
+    base_path = "/home/bill/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
     #ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
     ND_XS_ENDFB_KEY = "endfb80-n.bin"
