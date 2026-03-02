@@ -243,11 +243,6 @@ private:
   /**
    *
    */
-  void setPhotonBins(const fp::OutputData &fispact_output);
-
-  /**
-   *
-   */
   std::vector<double> &getNeutronBins() {
     if (_neutron_bins.empty()) {
       mooseError("_neutron_bins not set, so could not be gotten");

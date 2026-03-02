@@ -7,6 +7,7 @@
 /// Custom user object includes
 #include "FispactSchedule.h"
 
+#include "EnergyGroups.h"
 #include "HDF5Utils.h"
 #include "InputParameters.h"
 #include "MooseEnum.h"
@@ -202,6 +203,8 @@ void FispactProblem::initialSetup() {
   /// Set neutron bin type
   setInputNeutronBins();
 
+  _photon_bins = utils::energy_groups::gamma_groups[_n_photon_bins];
+
   /// Get n FISPACT Schedule Times
   FispactSchedule &schedule = getUserObject<FispactSchedule>(_schedule_uo_name);
 
@@ -305,10 +308,6 @@ void FispactProblem::externalSolve() {
         fp::Process(fispact_input, _fp_nuclear_data, fispact_output,
                     _fp_monitor, process_callback);
 
-        if (_photon_bins.empty()) {
-          setPhotonBins(fispact_output);
-        }
-
         /// Loop over number of inventories to get all data for current
         /// element
         for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
@@ -335,13 +334,6 @@ void FispactProblem::externalSolve() {
     calculateLocalDomainStrength();
 
     if (_write_photon_flux) {
-	
-      /// There is a possibility that a given rank had elements, all with zero flux.
-      /// Because _photon_bins gets set from the fispact_output object, if a calculation never takes place then it never gets set! So this makes sure even those ranks have valid _photon_bins
-      int broadcast_rank = !_photon_bins.empty() ? comm().rank(): -1;
-      comm().max(broadcast_rank);
-      comm().broadcast(_photon_bins, broadcast_rank);
-      _console << broadcast_rank << std::endl;
 
       const std::vector<double> &inv_times =
           getUserObject<FispactSchedule>(_schedule_uo_name)
@@ -435,24 +427,6 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
   }
 
   if (direction == ExternalProblem::Direction::TO_EXTERNAL_APP) {
-  }
-}
-
-void FispactProblem::setPhotonBins(const fp::OutputData &fispact_output) {
-
-  // Retrieve gamma spectrum boundaries from first fispact inv step
-  size_t fispact_step = 1;
-  std::vector<double> bounds =
-      fispact_output.getGammaSpectrumBoundaries(fispact_step);
-
-  _photon_bins = bounds;
-
-  // Scale photon bin entries to get them into eV
-  for (int i = 0; i < _photon_bins.size(); i++) {
-    if (i == 0) {
-      continue;
-    }
-    _photon_bins[i] *= 1e6;
   }
 }
 
