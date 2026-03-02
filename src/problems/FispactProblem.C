@@ -167,8 +167,9 @@ FispactProblem::FispactProblem(const InputParameters &params)
 
 #ifdef LIBMESH_HAVE_BOOST
 
-    /// Remove any shared memory region with a similar name just in case
+    /// Remove any potentially left over shared memory segments
     bi::shared_memory_object::remove(_interprocess_segment_name.c_str());
+    comm().barrier();
 
     /// Calculate space needed for shared mem region
     unsigned long shared_memory_size = calculateMemorySize();
@@ -182,6 +183,11 @@ FispactProblem::FispactProblem(const InputParameters &params)
                "with BOOST. No communication occuring.");
 #endif
   }
+}
+
+FispactProblem::~FispactProblem() {
+  /// Remove any shared memory region with a similar name just in case
+  bi::shared_memory_object::remove(_interprocess_segment_name.c_str());
 }
 
 void FispactProblem::initialSetup() {
@@ -718,8 +724,14 @@ const std::string FispactProblem::generateInterprocessName() {
   int len = 0;
   int err = MPI_Get_processor_name(mpi_proc_name, &len);
 
+  MPI_Comm node_comm;
+  int local_rank;
+  MPI_Comm_split_type(comm().get(), MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL,
+                      &node_comm);
+  MPI_Comm_rank(node_comm, &local_rank);
+
   std::string ipc_name = std::string(mpi_proc_name);
-  ipc_name += "_" + std::to_string(comm().rank());
+  ipc_name += "_" + std::to_string(local_rank);
 
   return ipc_name;
 }

@@ -42,6 +42,8 @@ class FispactProblem : public ExternalProblem {
 public:
   FispactProblem(const InputParameters &params);
 
+  ~FispactProblem();
+
   static InputParameters validParams();
 
   virtual void initialSetup() override;
