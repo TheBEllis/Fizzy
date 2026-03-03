@@ -143,7 +143,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _schedule_uo_name(getParam<UserObjectName>("fispact_schedule_uo")),
       _local_domain_strength(0), _total_domain_strength(0),
       _write_photon_flux(getParam<bool>("write_photon_flux")),
-      _comm_photon_flux(getParam<bool>("comm_photon_flux")),
+      _comm_photon_flux(getParam<bool>("comm_photon_flux")), _solved(false),
       _interprocess_segment_name(generateInterprocessName()),
       _molar_mass_data_filename(getParam<FileName>("molar_mass_data")) {
 
