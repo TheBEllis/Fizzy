@@ -115,9 +115,9 @@ InputParameters FispactProblem::validParams() {
       "Boolean value used to indicate whether to use boost::interprocess to "
       "communicate photon spectra through IPC.");
 
-  params.addRequiredParam<FileName>(
-      "molar_mass_data",
-      "Filename for HDF5 file containing molar mass data for all isotopes");
+  params.addRequiredParam<FileName>("molar_mass_data",
+                                    "Filename for HDF5 file containing molar "
+                                    "mass data in g/mol for all isotopes");
 
   params.addParam<MooseEnum>(
       "conversion_type", MooseEnum("LETHARGY ENERGY", "LETHARGY"),
@@ -451,8 +451,8 @@ void FispactProblem::setFispactInputData(
   /// Set atoms threshold
   input.setAtomsThreshold(1.0e3);
 
-  /// Volume read in is in cm^3, so we need to scale by 1e-6, as mass is in kg
-  double total_mass = density * volume * 1e-6;
+  // g/cm^3 * cm ^3 * 0.001 = kg
+  double total_mass_grams = density * volume;
 
   //
   if (material.getMaterialType() == "MASS") {
@@ -460,8 +460,8 @@ void FispactProblem::setFispactInputData(
     std::vector<int> atomic_numbers;
     std::vector<double> percent;
 
-    /// Set total mass
-    input.setMassTotal(total_mass);
+    /// Set total mass, in kg!
+    input.setMassTotal(total_mass_grams * 1e-3);
 
     const std::unordered_map<std::string, double> &nuclideFractionMap =
         material.getNuclideFractionMap();
@@ -492,7 +492,7 @@ void FispactProblem::setFispactInputData(
     /// input fuel
     for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
 
-      double zai_mass = total_mass * mass_fraction;
+      double zai_mass = total_mass_grams * mass_fraction;
 
       zais.push_back(fp::util::GetZai(monitor, isotope_name));
 
