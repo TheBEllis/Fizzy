@@ -594,18 +594,19 @@ void FispactProblem::convertGammaEvToCount(
   /// Reserve memory for photons per cc per s vector
   photon_energy_spectra_per_s.resize(photon_energy_spectra_ev.size(), 0);
 
-  const std::vector<double> &photon_flux_bins = getPhotonBins();
   /// Convert from MeV/s to per cc per s for each bin
   for (int i = 0; i < photon_energy_spectra_ev.size(); i++) {
-    double bin_energy = photon_flux_bins[i] +
-                        ((photon_flux_bins[i + 1] - photon_flux_bins[i]) / 2);
+    double bin_energy =
+        _photon_bins[i] + ((_photon_bins[i + 1] - _photon_bins[i]) / 2);
 
     /**
      * per_cc_per_s = MeV/s * (inventory_density/(inventory_mass *
      * energy_bin_midpoint))
      */
+    /// _photon_bins are in eV, but Photon Spectra is returned in by FISPACT in
+    /// MeV, so need 1e6
     photon_energy_spectra_per_s[i] =
-        photon_energy_spectra_ev[i] * (1 / bin_energy);
+        photon_energy_spectra_ev[i] * (1e6 / bin_energy);
   }
 }
 
