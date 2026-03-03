@@ -451,7 +451,6 @@ void FispactProblem::setFispactInputData(
   /// Set atoms threshold
   input.setAtomsThreshold(1.0e3);
 
-  // g/cm^3 * cm ^3 * 0.001 = kg
   double total_mass_grams = density * volume;
 
   //
@@ -492,7 +491,8 @@ void FispactProblem::setFispactInputData(
     /// input fuel
     for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
 
-      double zai_mass = total_mass_grams * mass_fraction;
+      // Our mass fraction is in percentage, so we need to divide by 100
+      double zai_mass = total_mass_grams * (mass_fraction / 100);
 
       zais.push_back(fp::util::GetZai(monitor, isotope_name));
 
