@@ -38,7 +38,7 @@
   [Schedule]
     type = FispactSchedule
     times = '300 30 30 30 30 30'
-    flux_schedule = '1e10 0 0 0 0 0'  
+    flux_amplitude = '1e10 0 0 0 0 0'  
   []
 
   [endf_nuclear_data]
