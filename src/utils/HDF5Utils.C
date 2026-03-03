@@ -89,7 +89,7 @@ hid_t file_open(const char *filename, char mode, bool parallel,
   if (parallel) {
     // Setup file access property list with parallel I/O access
     plist = H5Pcreate(H5P_FILE_ACCESS);
-
+    H5Pset_all_coll_metadata_ops(plist, true);
     H5Pset_fapl_mpio(plist, comm, MPI_INFO_NULL);
   }
 #endif
