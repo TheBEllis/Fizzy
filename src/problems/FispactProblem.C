@@ -172,7 +172,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
 
 FispactProblem::~FispactProblem() {
   /// Remove any shared memory region with a similar name just in case
-  bi::shared_memory_object::remove(_interprocess_segment_name.c_str());
+  // bi::shared_memory_object::remove(_interprocess_segment_name.c_str());
 }
 
 void FispactProblem::initialSetup() {
@@ -188,12 +188,8 @@ void FispactProblem::initialSetup() {
 
   _photon_bins = utils::energy_groups::gamma_groups[_n_photon_bins];
 
-  /// Get n FISPACT Schedule Times
-  FispactSchedule &schedule =
-      getUserObject<FispactSchedule>(_fp_schedule_uo_name);
-
   /// Set _n_inventories
-  _n_inventories = schedule.getTimes().size();
+  _n_inventories = _fp_schedule_uo->getTimes().size();
 
   /// Reserve space in our solution vector
   // _photon_energy_spectra.resize(
@@ -295,9 +291,6 @@ void FispactProblem::externalSolve() {
 
       std::vector<double> input_flux =
           _fp_flux_input_uo->getElemFlux(global_elem_id);
-
-      // readElementNeutronFlux(
-      //     _neutron_flux_filename, global_elem_id, _neutron_flux_tally_id);
 
       /// Output how many elements have been checked
       _console << std::endl
@@ -526,22 +519,17 @@ void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
 }
 
 void FispactProblem::setFispactSchedule(fp::InputData &input,
-                                        const double &volume,
+                                        const double &element_volume,
                                         const double &neutron_flux_sum) const {
 
-  FispactSchedule &schedule =
-      getUserObject<FispactSchedule>(_fp_schedule_uo_name);
-
-  std::vector<double> flux_schedule = schedule.getFluxAmplitude();
-  const std::vector<double> &times = schedule.getTimes();
+  std::vector<double> flux_schedule = _fp_schedule_uo->getFluxAmplitude();
+  const std::vector<double> &times = _fp_schedule_uo->getTimes();
 
   /// Need to scale input flux amplitude by the total neutron flux in this
   /// element/ volume
   for (auto &flux_amplitude : flux_schedule) {
-
-    flux_amplitude *= neutron_flux_sum / volume;
+    flux_amplitude *= neutron_flux_sum / element_volume;
   }
-
   input.setSchedule(times, flux_schedule);
 }
 
