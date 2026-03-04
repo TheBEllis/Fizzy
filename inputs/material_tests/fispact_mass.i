@@ -29,7 +29,7 @@
   []
 
   [steel]
-    type = FISPACTMaterial
+    type = FispactMaterial
     material_type = MASS 
     nuclides = 'Fe Mo'
     nuclide_fraction = '0.7 0.3'

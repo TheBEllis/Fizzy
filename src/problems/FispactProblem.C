@@ -256,9 +256,9 @@ void FispactProblem::resolveFispactUserObjects() {
   uo_query.queryInto(userobjs);
 
   for (const auto u : userobjs) {
-    if (u->type() == "FISPACTMaterial") {
+    if (u->type() == "FispactMaterial") {
 
-      _fp_fispact_materials.push_back(dynamic_cast<FISPACTMaterial *>(u));
+      _fp_fispact_materials.push_back(dynamic_cast<FispactMaterial *>(u));
     }
   }
 }
@@ -306,7 +306,7 @@ void FispactProblem::externalSolve() {
           convertFluxEnergyGroups(input_flux);
         }
 
-        const FISPACTMaterial &input_material =
+        const FispactMaterial &input_material =
             getElementMaterial(global_elem_id);
 
         setFispactInputData(_fp_monitor, input_material, input_flux,
@@ -445,7 +445,7 @@ void FispactProblem::convertFluxEnergyGroups(std::vector<double> &input_flux) {
  * setFispactInputMaterial
  */
 void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
-                                         const FISPACTMaterial &material,
+                                         const FispactMaterial &material,
                                          const std::vector<double> &flux,
                                          const double &volume,
                                          fp::InputData &input) const {
@@ -533,12 +533,12 @@ void FispactProblem::setFispactSchedule(fp::InputData &input,
   input.setSchedule(times, flux_schedule);
 }
 
-const FISPACTMaterial &
+const FispactMaterial &
 FispactProblem::getElementMaterial(dof_id_type &elem_id) {
 
   libMesh::Elem *elem = _mesh.elemPtr(elem_id);
 
-  // Query the warehouse to see if a FISPACTMaterial exists on the block this
+  // Query the warehouse to see if a FispactMaterial exists on the block this
   // element is assigned to
   std::vector<GeneralUserObject *> objs;
   theWarehouse()
@@ -547,10 +547,10 @@ FispactProblem::getElementMaterial(dof_id_type &elem_id) {
       .condition<AttribSubdomains>(elem->subdomain_id())
       .queryInto(objs);
 
-  // Remove extraneous user objects that are not FISPACTMaterials. Having done
+  // Remove extraneous user objects that are not FispactMaterials. Having done
   // this, only one object should remain in the vector, and it should be the
   for (auto it = objs.begin(); it != objs.end();) {
-    if ((*it)->type() != "FISPACTMaterial") {
+    if ((*it)->type() != "FispactMaterial") {
       it = objs.erase(it);
     } else {
       ++it;
@@ -558,18 +558,18 @@ FispactProblem::getElementMaterial(dof_id_type &elem_id) {
   }
 
   // FISPACT material pertaining to this block. If there ismore than one
-  // object, then two FISPACTMaterials are assigned to this block, and that
+  // object, then two FispactMaterials are assigned to this block, and that
   // makes no blimmin sense does it
   if (objs.empty()) {
-    mooseError("Unable to find FISPACTMaterial object on block " +
+    mooseError("Unable to find FispactMaterial object on block " +
                std::to_string(elem->subdomain_id()));
   } else if (objs.size() > 1) {
-    mooseError("More than 1 FISPACTMaterial definition exists on block " +
+    mooseError("More than 1 FispactMaterial definition exists on block " +
                std::to_string(elem->subdomain_id()));
   }
 
-  /// Return the FISPACTMaterial
-  return *(static_cast<FISPACTMaterial *>(objs[0]));
+  /// Return the FispactMaterial
+  return *(static_cast<FispactMaterial *>(objs[0]));
 }
 
 bool FispactProblem::isFlux(const std::vector<double> &flux) const {
@@ -756,8 +756,8 @@ void FispactProblem::checkForEnergyGroupConsistency() {
   }
 }
 
-// TO DO: Move most of this functionality to FISPACTMaterial, allow
-// FISPACTMaterial to take in a wider range of inputs eg density units, and do
+// TO DO: Move most of this functionality to FispactMaterial, allow
+// FispactMaterial to take in a wider range of inputs eg density units, and do
 // the hard work there
 void FispactProblem::read_material_xml_data() {
   pugi::xml_document doc;
@@ -771,7 +771,7 @@ void FispactProblem::read_material_xml_data() {
   for (pugi::xml_node material : doc.child("materials").children()) {
 
     InputParameters params =
-        _app.getFactory().getValidParams("FISPACTMaterial");
+        _app.getFactory().getValidParams("FispactMaterial");
 
     /// Get material name
     std::string material_name = material.attribute("name").value();
@@ -845,7 +845,7 @@ void FispactProblem::read_material_xml_data() {
     params.set<std::vector<std::string>>("nuclides") = nuclides;
     params.set<std::vector<double>>("nuclide_fraction") = nuclide_fractions;
 
-    addUserObject("FISPACTMaterial", material_name, params);
+    addUserObject("FispactMaterial", material_name, params);
   }
 }
 

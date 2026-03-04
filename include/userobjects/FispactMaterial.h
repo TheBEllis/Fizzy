@@ -4,11 +4,11 @@
 #include "GeneralUserObject.h"
 #include <unordered_map>
 
-class FISPACTMaterial : public GeneralUserObject, public BlockRestrictable {
+class FispactMaterial : public GeneralUserObject, public BlockRestrictable {
 public:
   static InputParameters validParams();
 
-  FISPACTMaterial(const InputParameters &params);
+  FispactMaterial(const InputParameters &params);
 
   virtual void initialize() {}
   virtual void finalize() {}

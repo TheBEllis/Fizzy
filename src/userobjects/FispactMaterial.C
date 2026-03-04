@@ -1,12 +1,12 @@
-#include "FISPACTMaterial.h"
+#include "FispactMaterial.h"
 
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
 
-registerMooseObject("FizzyApp", FISPACTMaterial);
+registerMooseObject("FizzyApp", FispactMaterial);
 
-InputParameters FISPACTMaterial::validParams() {
+InputParameters FispactMaterial::validParams() {
   InputParameters params = GeneralUserObject::validParams();
   params += BlockRestrictable::validParams();
 
@@ -29,7 +29,7 @@ InputParameters FISPACTMaterial::validParams() {
   return params;
 }
 
-FISPACTMaterial::FISPACTMaterial(const InputParameters &parameters)
+FispactMaterial::FispactMaterial(const InputParameters &parameters)
     : GeneralUserObject(parameters), BlockRestrictable(this),
       _density(getParam<double>("density")),
       _material_type(getParam<MooseEnum>("material_type")) {
@@ -85,7 +85,7 @@ FISPACTMaterial::FISPACTMaterial(const InputParameters &parameters)
   }
 }
 
-const std::vector<std::string> FISPACTMaterial::getNuclides() const {
+const std::vector<std::string> FispactMaterial::getNuclides() const {
 
   std::vector<std::string> nuclides;
 
@@ -95,7 +95,7 @@ const std::vector<std::string> FISPACTMaterial::getNuclides() const {
   return nuclides;
 }
 
-const std::vector<double> FISPACTMaterial::getNuclideFractions() const {
+const std::vector<double> FispactMaterial::getNuclideFractions() const {
 
   std::vector<double> nuclide_fractions;
 

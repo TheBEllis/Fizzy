@@ -3,8 +3,8 @@
 #include "ExternalProblem.h"
 
 #include "../../include/userobjects/FispactNuclearDataPaths.C"
-#include "FISPACTMaterial.h"
 #include "FispactFluxInput.h"
+#include "FispactMaterial.h"
 #include "FispactSchedule.h"
 
 #include "HDF5Utils.h"
@@ -121,7 +121,7 @@ private:
    * @param[out] input the now correctly setup FISPACT input object
    */
   void setFispactInputData(const fp::FispactMonitor &monitor,
-                           const FISPACTMaterial &material,
+                           const FispactMaterial &material,
                            const std::vector<double> &neutron_flux,
                            const double &volume, fp::InputData &input) const;
 
@@ -236,7 +236,7 @@ private:
    * Return a vector populated with the number of atoms of each isotope in a
    * given material
    */
-  std::vector<double> getMaterialAtoms(const FISPACTMaterial &material);
+  std::vector<double> getMaterialAtoms(const FispactMaterial &material);
 
   /**
    * Load in molar mass data from HDF5 file set using input params
@@ -318,7 +318,7 @@ private:
   std::string _materials_xml_file;
 
   ///
-  const FISPACTMaterial &getElementMaterial(dof_id_type &elem_id);
+  const FispactMaterial &getElementMaterial(dof_id_type &elem_id);
 
   ///
   // const size_t _input_neutron_bin_structure;
@@ -356,7 +356,7 @@ private:
 
   FispactFluxInput *_fp_flux_input_uo;
 
-  std::vector<FISPACTMaterial *> _fp_fispact_materials;
+  std::vector<FispactMaterial *> _fp_fispact_materials;
 
   /// Vector to store local domain strength over all inventory times
   std::vector<double> _local_domain_strength;
