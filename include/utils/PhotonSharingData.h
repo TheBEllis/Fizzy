@@ -85,19 +85,17 @@ public:
   void setPhotonSpectra(const std::vector<double>::iterator spectra_begin,
                         const std::vector<double>::iterator spectra_end) {
 
-    _photon_fluxes = BoostIpVector(spectra_begin, spectra_end, _vec_alloc);
+    _photon_fluxes.assign(spectra_begin, spectra_end);
   }
 
   void
   setElementStrengths(const std::vector<double>::iterator elem_strength_begin,
                       const std::vector<double>::iterator elem_strength_end) {
-    _elem_strength =
-        BoostIpVector(elem_strength_begin, elem_strength_end, _vec_alloc);
+    _elem_strength.assign(elem_strength_begin, elem_strength_end);
   }
 
   void setPhotonBins(const std::vector<double> &photon_bins) {
-    _photon_bins =
-        BoostIpVector(photon_bins.begin(), photon_bins.end(), _vec_alloc);
+    _photon_bins.assign(photon_bins.begin(), photon_bins.end());
   }
 
   void setNumPhotonBins(const size_t &n_photon_bins) {
