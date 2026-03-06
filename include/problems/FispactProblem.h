@@ -2,40 +2,19 @@
 
 #include "ExternalProblem.h"
 
-#include "../../include/userobjects/FispactNuclearDataPaths.C"
+#include "FispactFactory.h"
 #include "FispactFluxInput.h"
 #include "FispactMaterial.h"
+#include "FispactNuclearDataPaths.h"
 #include "FispactSchedule.h"
-
-#include "HDF5Utils.h"
-
-#include "MooseTypes.h"
 #include "PhotonSpectra.h"
 
-// Fispact includes
-#include "fispactcompute.hpp"
-#include "fispactmonitor.hpp"
-#include "fispactutil.hpp"
-
-#include "fispactelementaldata.hpp"
-#include "fispactgroupconvert.hpp"
-#include "fispactgroupstructures.hpp"
-#include "fispactinputdata.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactoutputdata.hpp"
-#include "fispactutil.hpp"
-
-#include "fispactinputdata.hpp"
-#include "fispactmonitor.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactoutputdata.hpp"
 // Include for interprocess communication data structure
+#include "HDF5Utils.h"
 #include "PhotonSharingData.h"
-#include "libmesh/id_types.h"
+#include <memory>
 #include <string>
 #include <unordered_map>
-
-namespace fp = fispact;
 
 #ifdef LIBMESH_HAVE_BOOST
 namespace bi = boost::interprocess;
@@ -58,27 +37,23 @@ public:
 
   void timestepSetup() override;
 
-private:
   /**
-   *
-   *
+   * Calculates the total strength of one elements photon source term
+   * @param[in] element a ptr to the libmesh element whose strength we are
+   * calculating
+   * @param[in] element_flux the vector representing the energy binned photon
+   * flux for the relevent mesh element
+   * @return the total strength of the photon source term for this element
    *
    */
-  static void load_callback(std::string key, std::string path, int i, int t) {
-    std::cout << "\33[2K\r" << key << ": " << path << " [" << i << "/" << t
-              << "]" << std::flush;
-  }
-
+  double calculateElementStrength(const libMesh::Elem *element,
+                                  const std::vector<double> element_flux);
   /**
    *
-   *
-   *
    */
-  static void process_callback(std::string process_name, int i, int t) {
-    std::cout << "\33[2K\r [" << i << "/" << t << "] " << process_name
-              << std::flush;
-  }
+  bool isFlux(const std::vector<double> &flux) const;
 
+protected:
   /**
    * Set the nuclear data for FISPACT
    * @param[in] nd_base_path The directory containing the various nuclear data
@@ -120,10 +95,10 @@ private:
    * calculation corresponds to
    * @param[out] input the now correctly setup FISPACT input object
    */
-  void setFispactInputData(const fp::FispactMonitor &monitor,
-                           const FispactMaterial &material,
+  void setFispactInputData(const FispactMaterial &material,
                            const std::vector<double> &neutron_flux,
-                           const double &volume, fp::InputData &input) const;
+                           const double &volume,
+                           IFispactInputDataBase &input) const;
 
   /// Generate a log file name for the fispact logs
   std::string fispactLogName();
@@ -145,32 +120,19 @@ private:
   /**
    * Retrieve Fispact radiation schedule from FispactSchedule UserObject
    */
-  void setFispactSchedule(fp::InputData &input, const double &volume,
+  void setFispactSchedule(IFispactInputDataBase &input, const double &volume,
                           const double &neutron_flux_sum) const;
 
   /**
    * Converts FISPACT gamma spectra outputs from MeV s^-1 to cm^-3 s^-1
-   * @param[in] input FISPACT input
    * @param[in] photon_energy_spectra_ev Photon energy spectra as output by
    * FISPACT
    * @param[out] photon_energy_spectra_per_cc_s Photon energy spectra in
    * photons/cc-s
    */
   void
-  convertGammaEvToCount(const fp::InputData &input,
-                        const std::vector<double> &photon_energy_spectra_ev,
+  convertGammaEvToCount(const std::vector<double> &photon_energy_spectra_ev,
                         std::vector<double> &photon_energy_spectra_per_cc_s);
-  /**
-   * Calculates the total strength of one elements photon source term
-   * @param[in] element a ptr to the libmesh element whose strength we are
-   * calculating
-   * @param[in] element_flux the vector representing the energy binned photon
-   * flux for the relevent mesh element
-   * @return the total strength of the photon source term for this element
-   *
-   */
-  double calculateElementStrength(const libMesh::Elem *element,
-                                  const std::vector<double> element_flux);
   /**
    *
    */
@@ -185,35 +147,11 @@ private:
   /**
    *
    */
-  void printInventoryByHeat(fp::OutputData &output, int timestep_index,
-                            std::ostream &stream = std::cout);
-
-  /**
-   *
-   */
-  void printInventoryByMass(fp::OutputData &output, int timestep_index,
-                            std::ostream &stream);
-
-  /**
-   *
-   */
-  void printInvData(fp::OutputData &output, std::ostream &stream);
-
-  /**
-   *
-   */
   void getTotalDomainStrength();
 
   /**
    *
    */
-  double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
-
-  /**
-   *
-   */
-  bool isFlux(const std::vector<double> &flux) const;
-
   void resolveFispactUserObjects();
 
   /**
@@ -284,11 +222,7 @@ private:
   PhotonSharingData *_photon_sharing_instance;
 #endif
 
-  /// FISPACT monitor
-  fp::FispactMonitor _fp_monitor;
-
-  /// FISPACT nuclear data
-  fp::NuclearData _fp_nuclear_data;
+  std::unique_ptr<FispactContextBase> _fp_ctxt;
 
   /// FISPACT neutron flux
   std::unordered_map<int, std::vector<double>> _neutron_fluxes;
@@ -302,12 +236,6 @@ private:
   /// Vector to store all local element strengths over all inventory times
   /// Indexed by time major, element id minor
   std::vector<double> _element_strengths;
-
-  /// hdf5 filename for neutron flux
-  std::string _neutron_flux_filename;
-
-  /// path to neutron flux array in hdf5 file
-  size_t _neutron_flux_tally_id;
 
   /// hdf5 filename for photon flux
   std::string _photon_flux_filename;
@@ -387,8 +315,8 @@ private:
   /// Map from global element id to "local element id"
   std::unordered_map<uint64_t, uint64_t> _local_elem_index;
 
-  std::unordered_map<size_t, std::vector<double>> _neutron_group_map = {
-      {100, fp::groups::G100()},
-      {709, fp::groups::G709()},
-      {1102, fp::groups::G1102()}};
+  // std::unordered_map<size_t, std::vector<double>> _neutron_group_map = {
+  //     {100, fp::groups::G100()},
+  //     {709, fp::groups::G709()},
+  //     {1102, fp::groups::G1102()}};
 };

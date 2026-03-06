@@ -1,16 +1,6 @@
-#include "ExternalProblem.h"
-#include "FispactFluxInput.h"
-#include "FispactProblem.h"
-
 #include "EnergyGroups.h"
-
+#include "FispactProblem.h"
 //// PugiXML include
-#include "FispactSchedule.h"
-#include "PhotonSharingData.h"
-#include "fispactgroupconvert.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactutil.hpp"
-#include "libmesh/id_types.h"
 #include "pugixml.hpp"
 
 /// Cpp includes
@@ -19,6 +9,7 @@
 #include <filesystem>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -115,8 +106,7 @@ InputParameters FispactProblem::validParams() {
 }
 
 FispactProblem::FispactProblem(const InputParameters &params)
-    : ExternalProblem(params), _fp_monitor(fispactLogName()),
-      _fp_nuclear_data(_fp_monitor),
+    : ExternalProblem(params),
       _photon_flux_filename(getParam<FileName>("photon_flux_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _materials_xml_file(getParam<FileName>("materials_xml_file")),
@@ -141,12 +131,6 @@ FispactProblem::FispactProblem(const InputParameters &params)
                  "not set! Photon flux filename defaulting to " +
                      _photon_flux_filename);
   }
-
-  /// Check a corresponding material exists for all mesh blocks
-  // checkMaterialsExist();
-
-  /// Initialise FISPACT
-  fp::GlobalInitialise(_fp_monitor);
 
   if (_comm_photon_flux) {
 
@@ -177,6 +161,11 @@ FispactProblem::~FispactProblem() {
 
 void FispactProblem::initialSetup() {
   ExternalProblem::initialSetup();
+
+  _fp_ctxt = createFispactContext(false);
+
+  // Init FISPACT
+  _fp_ctxt->globalInitialise();
 
   resolveFispactUserObjects();
 
@@ -241,6 +230,8 @@ void FispactProblem::initialSetup() {
     /// Populate _mat_definitions with materials from openmc xml
     read_material_xml_data();
   }
+  /// Check a corresponding material exists for all mesh blocks
+  // checkMaterialsExist();
 }
 
 void FispactProblem::resolveFispactUserObjects() {
@@ -279,10 +270,6 @@ void FispactProblem::externalSolve() {
 
   if (!_solved) {
 
-    /// Set up fispact input data
-    fp::InputData fispact_input(_fp_monitor);
-    fp::OutputData fispact_output(_fp_monitor);
-
     int counter = 1;
     for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
@@ -309,11 +296,10 @@ void FispactProblem::externalSolve() {
         const FispactMaterial &input_material =
             getElementMaterial(global_elem_id);
 
-        setFispactInputData(_fp_monitor, input_material, input_flux,
-                            element->volume(), fispact_input);
+        setFispactInputData(input_material, input_flux, element->volume(),
+                            _fp_ctxt->getInput());
         /// Run FISPACT
-        fp::Process(fispact_input, _fp_nuclear_data, fispact_output,
-                    _fp_monitor, process_callback);
+        _fp_ctxt->process();
 
         /// Loop over number of inventories to get all data for current
         /// element
@@ -325,7 +311,7 @@ void FispactProblem::externalSolve() {
           /// Calculated Fispact inventories start at index 1, 0 is reserved
           /// for initial concentrations
           convertGammaEvToCount(
-              fispact_input, fispact_output.getGammaSpectrumBins(inv_index + 1),
+              _fp_ctxt->getOutput().getGammaSpectrumBins(inv_index + 1),
               element_photon_energy_spectrum);
 
           std::copy(element_photon_energy_spectrum.begin(),
@@ -347,7 +333,7 @@ void FispactProblem::externalSolve() {
       writePhotonFlux(_photon_flux_filename, inv_times);
     }
 
-    fp::GlobalFinalise(_fp_monitor);
+    _fp_ctxt->globalFinalise();
 
     _solved = true;
   }
@@ -431,12 +417,12 @@ void FispactProblem::convertFluxEnergyGroups(std::vector<double> &input_flux) {
       _fp_flux_input_uo->getFluxEnergyGroups();
   switch (getParam<MooseEnum>("conversion_type")) {
   case 0: // LETHARGY
-    input_flux = fp::groupconvert::GroupConvertByLethargy(
-        _fp_monitor, input_energy_groups, input_flux, _flux_energy_groups);
+    input_flux = _fp_ctxt->getUtils().GroupConvertByLethargy(
+        input_energy_groups, input_flux, _flux_energy_groups);
 
   case 1: // ENERGY
-    input_flux = fp::groupconvert::GroupConvertByEnergy(
-        _fp_monitor, input_energy_groups, input_flux, _flux_energy_groups);
+    input_flux = _fp_ctxt->getUtils().GroupConvertByEnergy(
+        input_energy_groups, input_flux, _flux_energy_groups);
   }
 }
 
@@ -444,11 +430,10 @@ void FispactProblem::convertFluxEnergyGroups(std::vector<double> &input_flux) {
  * TODO: Break up this function into setFispactInputFlux and
  * setFispactInputMaterial
  */
-void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
-                                         const FispactMaterial &material,
+void FispactProblem::setFispactInputData(const FispactMaterial &material,
                                          const std::vector<double> &flux,
                                          const double &volume,
-                                         fp::InputData &input) const {
+                                         IFispactInputDataBase &input) const {
 
   /// Set neutron flux
   input.setFlux(_flux_energy_groups, flux);
@@ -481,7 +466,7 @@ void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
     for (auto &[element_name, mass_fraction] : nuclideFractionMap) {
 
       atomic_numbers.push_back(
-          fp::util::GetAtomicNumberFromElementName(monitor, element_name));
+          _fp_ctxt->getUtils().GetAtomicNumberFromElementName(element_name));
     }
 
     input.setMass(atomic_numbers, material.getNuclideFractions());
@@ -505,7 +490,7 @@ void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
       // Our mass fraction is in percentage, so we need to divide by 100
       double zai_mass = total_mass_grams * (mass_fraction / 100);
 
-      zais.push_back(fp::util::GetZai(monitor, isotope_name));
+      zais.push_back(_fp_ctxt->getUtils().GetZai(isotope_name));
 
       atoms.push_back(
           getNumAtoms(zai_mass, _molar_mass_map.at(zais.back()), AVOGADRO));
@@ -518,7 +503,7 @@ void FispactProblem::setFispactInputData(const fp::FispactMonitor &monitor,
   setFispactSchedule(input, volume, flux_sum);
 }
 
-void FispactProblem::setFispactSchedule(fp::InputData &input,
+void FispactProblem::setFispactSchedule(IFispactInputDataBase &input,
                                         const double &element_volume,
                                         const double &neutron_flux_sum) const {
 
@@ -584,7 +569,6 @@ bool FispactProblem::isFlux(const std::vector<double> &flux) const {
 }
 
 void FispactProblem::convertGammaEvToCount(
-    const fp::InputData &input,
     const std::vector<double> &photon_energy_spectra_ev,
     std::vector<double> &photon_energy_spectra_per_s) {
 
@@ -673,15 +657,17 @@ int FispactProblem::calculateMemorySize() {
 }
 
 std::string FispactProblem::fispactLogName() {
-  std::string log_name = "FISPACT_app_" +
-                         this->getMooseApp().getInputFileNames()[0] +
-                         std::to_string(processor_id()) + ".log";
+  // std::string log_name = "FISPACT_app_" +
+  //                        this->getMooseApp().getInputFileNames()[0] +
+  //                        std::to_string(processor_id()) + ".log";
+
+  std::string log_name =
+      "FISPACT_app_" + std::to_string(processor_id()) + ".log";
   return log_name;
 }
 
 void FispactProblem::setNuclearData() {
-  _fp_nuclear_data_uo->loadNuclearData(_fp_nuclear_data, _fp_monitor,
-                                       load_callback);
+  _fp_ctxt->setNuclearData(_fp_nuclear_data_uo->getNuclearDataPathMap());
 }
 
 const std::string FispactProblem::generateInterprocessName() {
@@ -733,7 +719,7 @@ void FispactProblem::loadMolarMasses() {
 
   for (int i = 0; i < molar_masses.size(); i++) {
 
-    int zai = fp::util::GetZai(_fp_monitor, element_symbols[i]);
+    int zai = _fp_ctxt->getUtils().GetZai(element_symbols[i]);
     std::pair<int, double> key_value =
         std::pair<int, double>(zai, molar_masses[i]);
     _molar_mass_map.insert(key_value);
@@ -741,10 +727,11 @@ void FispactProblem::loadMolarMasses() {
 }
 
 void FispactProblem::checkForEnergyGroupConsistency() {
-  size_t n_nd_energy_groups = _fp_nuclear_data.getReactionXS(0, 0).size();
+  size_t n_nd_energy_groups = _fp_ctxt->getNuclearDataCrossSections();
 
   if (_fp_flux_input_uo->getNumEnergyGroups() != n_nd_energy_groups) {
-    _flux_energy_groups = _neutron_group_map[n_nd_energy_groups];
+    _flux_energy_groups =
+        utils::energy_groups::neutron_groups[n_nd_energy_groups];
     _convert_energy_groups = true;
 
     std::string conversion_type = getParam<MooseEnum>("conversion_type");
@@ -816,7 +803,7 @@ void FispactProblem::read_material_xml_data() {
       std::vector<double> molar_masses;
 
       for (int i = 0; i < nuclides.size(); i++) {
-        int zai = fp::util::GetZai(_fp_monitor, nuclides.at(i));
+        int zai = _fp_ctxt->getUtils().GetZai(nuclides.at(i));
         molar_masses.push_back(_molar_mass_map.at(zai));
         sum_fraction_time_atomic_weight +=
             molar_masses.back() * abs(nuclide_fractions.at(i));
