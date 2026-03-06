@@ -64,6 +64,10 @@ InputParameters FispactProblem::validParams() {
       "fispact_input_flux_uo",
       "Name of the FispactFluxInput user object defining "
       "the input flux spectra");
+
+  params.addParam<bool>("mock_fispact", false,
+                        "Parameter exclusively for unit testing when we don't "
+                        "wish to use the actual FISPACT library");
   params.addParam<bool>(
       "read_materials_from_xml", false,
       "Parameter determining whether user wishes to read materaial nuclide "
@@ -162,7 +166,11 @@ FispactProblem::~FispactProblem() {
 void FispactProblem::initialSetup() {
   ExternalProblem::initialSetup();
 
-  _fp_ctxt = createFispactContext(false);
+  _fp_ctxt = createFispactContext(getParam<bool>("mock_fispact"));
+  if (!_fp_ctxt) {
+    mooseError("Fispact context could not be initialised! Maybe user has asked "
+               "to use mock fispact outside of unit tests?");
+  }
 
   // Init FISPACT
   _fp_ctxt->globalInitialise();

@@ -53,6 +53,9 @@ public:
    */
   bool isFlux(const std::vector<double> &flux) const;
 
+  ///
+  const FispactMaterial &getElementMaterial(dof_id_type &elem_id);
+
 protected:
   /**
    * Set the nuclear data for FISPACT
@@ -244,9 +247,6 @@ protected:
 
   /// Filename of xml file to read materials from
   std::string _materials_xml_file;
-
-  ///
-  const FispactMaterial &getElementMaterial(dof_id_type &elem_id);
 
   ///
   // const size_t _input_neutron_bin_structure;
