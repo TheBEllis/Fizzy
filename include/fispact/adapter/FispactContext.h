@@ -153,81 +153,100 @@ public:
     for (auto &[data, path] : nuclear_data_paths) {
       if (data == "ND_IND_NUC_KEY") {
         nd_reader.setPath(FISPACT_ND_IND_NUC_KEY, path);
+        continue;
       }
 
       if (data == "ND_HAZARDS_KEY") {
         nd_reader.setPath(FISPACT_ND_HAZARDS_KEY, path);
+        continue;
       }
 
       if (data == "ND_ABSORP_KEY") {
 
         nd_reader.setPath(FISPACT_ND_ABSORP_KEY, path);
+        continue;
       }
 
       if (data == "ND_CLEAR_KEY") {
 
         nd_reader.setPath(FISPACT_ND_CLEAR_KEY, path);
+        continue;
       }
 
       if (data == "ND_A2DATA_KEY") {
         nd_reader.setPath(FISPACT_ND_A2DATA_KEY, path);
+        continue;
       }
 
       if (data == "ND_ENBINS_KEY") {
         nd_reader.setPath(FISPACT_ND_ENBINS_KEY, path);
+        continue;
       }
 
       if (data == "ND_DECAY_KEY") {
         nd_reader.setPath(FISPACT_ND_DECAY_KEY, path);
+        continue;
       }
 
       if (data == "ND_DK_ENDF_KEY") {
         nd_reader.setPath(FISPACT_ND_DK_ENDF_KEY, path);
+        continue;
       }
 
       if (data == "ND_PROB_TAB_KEY") {
         nd_reader.setPath(FISPACT_ND_PROB_TAB_KEY, path);
+        continue;
       }
 
       if (data == "ND_ASSCFY_KEY") {
         nd_reader.setPath(FISPACT_ND_ASSCFY_KEY, path);
+        continue;
       }
 
       if (data == "ND_FISSYLD_KEY") {
         nd_reader.setPath(FISPACT_ND_FISSYLD_KEY, path);
+        continue;
       }
 
       if (data == "ND_FY_ENDF_KEY") {
         nd_reader.setPath(FISPACT_ND_FY_ENDF_KEY, path);
+        continue;
       }
 
       if (data == "ND_SF_ENDF_KEY") {
         nd_reader.setPath(FISPACT_ND_SF_ENDF_KEY, path);
+        continue;
       }
 
       if (data == "ND_SP_ENDF_KEY") {
         nd_reader.setPath(FISPACT_ND_SP_ENDF_KEY, path);
+        continue;
       }
 
       if (data == "ND_XS_EXTRA_KEY") {
         nd_reader.setPath(FISPACT_ND_XS_EXTRA_KEY, path);
+        continue;
       }
 
       if (data == "ND_CROSSEC_KEY") {
         nd_reader.setPath(FISPACT_ND_CROSSEC_KEY, path);
+        continue;
       }
 
       if (data == "ND_CROSSUNC_KEY") {
         nd_reader.setPath(FISPACT_ND_CROSSUNC_KEY, path);
+        continue;
       }
 
       if (data == "ND_XS_ENDF_KEY") {
         nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, path);
+        continue;
       }
 
       if (data == "ND_XS_ENDFB_KEY") {
         nd_reader.setUseXSBinary(true);
         nd_reader.setPath(FISPACT_ND_XS_ENDFB_KEY, path);
+        continue;
       }
     }
     // Load the nuclear data

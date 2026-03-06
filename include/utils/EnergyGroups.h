@@ -18,7 +18,7 @@ inline std::vector<double> ukaea709() {
   double dlog = (logEmax - logEmin) / groups;
 
   for (int i = 0; i <= groups; ++i)
-    bounds[i] = std::pow(10.0, logEmax - i * dlog);
+    bounds[i] = std::pow(10.0, logEmin + i * dlog);
 
   return bounds;
 }
@@ -36,7 +36,7 @@ inline std::vector<double> ukaea1102() {
   double dlog = (logEmax - logEmin) / groups;
 
   for (int i = 0; i <= groups; ++i)
-    bounds[i] = std::pow(10.0, logEmax - i * dlog);
+    bounds[i] = std::pow(10.0, logEmin + i * dlog);
 
   return bounds;
 }
