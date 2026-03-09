@@ -46,8 +46,7 @@ public:
    * @return the total strength of the photon source term for this element
    *
    */
-  double calculateElementStrength(const libMesh::Elem *element,
-                                  const std::vector<double> element_flux);
+  double calculateElementStrength(const std::vector<double> element_flux);
   /**
    *
    */
@@ -55,6 +54,19 @@ public:
 
   ///
   const FispactMaterial &getElementMaterial(dof_id_type &elem_id);
+
+  void setPhotonBins(const std::vector<double> &photon_bins);
+
+  /**
+   * Converts FISPACT gamma spectra outputs from MeV s^-1 to cm^-3 s^-1
+   * @param[in] photon_energy_spectra_ev Photon energy spectra as output by
+   * FISPACT
+   * @param[out] photon_energy_spectra_per_cc_s Photon energy spectra in
+   * photons/cc-s
+   */
+  void
+  convertGammaEvToCount(const std::vector<double> &photon_energy_spectra_ev,
+                        std::vector<double> &photon_energy_spectra_per_cc_s);
 
 protected:
   /**
@@ -126,16 +138,6 @@ protected:
   void setFispactSchedule(IFispactInputDataBase &input, const double &volume,
                           const double &neutron_flux_sum) const;
 
-  /**
-   * Converts FISPACT gamma spectra outputs from MeV s^-1 to cm^-3 s^-1
-   * @param[in] photon_energy_spectra_ev Photon energy spectra as output by
-   * FISPACT
-   * @param[out] photon_energy_spectra_per_cc_s Photon energy spectra in
-   * photons/cc-s
-   */
-  void
-  convertGammaEvToCount(const std::vector<double> &photon_energy_spectra_ev,
-                        std::vector<double> &photon_energy_spectra_per_cc_s);
   /**
    *
    */

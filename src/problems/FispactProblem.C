@@ -183,7 +183,7 @@ void FispactProblem::initialSetup() {
 
   loadMolarMasses();
 
-  _photon_bins = utils::energy_groups::gamma_groups[_n_photon_bins];
+  setPhotonBins(utils::energy_groups::gamma_groups[_n_photon_bins]);
 
   /// Set _n_inventories
   _n_inventories = _fp_schedule_uo->getTimes().size();
@@ -583,6 +583,12 @@ void FispactProblem::convertGammaEvToCount(
   /// Reserve memory for photons per cc per s vector
   photon_energy_spectra_per_s.resize(photon_energy_spectra_ev.size(), 0);
 
+  /// Assert in case, somehow, the spectra output by FISPACT has different bin
+  /// structure to _photon_bins??
+  mooseAssert(
+      _photon_bins.size() == photon_energy_spectra_ev.size() + 1,
+      "_photon_bins size should be one less that input photon spectra!");
+
   /// Convert from MeV/s to per cc per s for each bin
   for (int i = 0; i < photon_energy_spectra_ev.size(); i++) {
     double bin_energy =
@@ -599,8 +605,12 @@ void FispactProblem::convertGammaEvToCount(
   }
 }
 
+void FispactProblem::setPhotonBins(const std::vector<double> &photon_bins) {
+  _photon_bins = photon_bins;
+}
+
 double FispactProblem::calculateElementStrength(
-    const libMesh::Elem *element, const std::vector<double> element_flux) {
+    const std::vector<double> element_flux) {
   double element_strength = 0;
 
   for (double flux_bin : element_flux) {
@@ -613,7 +623,7 @@ double FispactProblem::calculateElementStrength(
 void FispactProblem::insertElementStrength(
     const int inv_index, const libMesh::Elem *element,
     const std::vector<double> element_flux) {
-  double elem_strength = calculateElementStrength(element, element_flux);
+  double elem_strength = calculateElementStrength(element_flux);
 
   int idx =
       (inv_index * _mesh.nActiveLocalElem()) + _local_elem_index[element->id()];
