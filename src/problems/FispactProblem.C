@@ -240,6 +240,12 @@ void FispactProblem::initialSetup() {
   }
   /// Check a corresponding material exists for all mesh blocks
   // checkMaterialsExist();
+  //
+  if (isParamSetByUser("output_inventory_time")) {
+    _output_inventory_time = (getParam<double>("output_inventory_time"));
+  } else {
+    _output_inventory_time = _fp_schedule_uo->getCumulativeTimes().back();
+  }
 }
 
 void FispactProblem::resolveFispactUserObjects() {

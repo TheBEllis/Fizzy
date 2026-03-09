@@ -68,6 +68,18 @@ public:
   convertGammaEvToCount(const std::vector<double> &photon_energy_spectra_ev,
                         std::vector<double> &photon_energy_spectra_per_cc_s);
 
+  std::unordered_map<uint64_t, uint64_t> &getLocalElemIndexMap() {
+    return _local_elem_index;
+  }
+
+  PhotonSpectra *getPhotonSpectra() const {
+    return _photon_energy_spectra.get();
+  }
+
+  const FispactSchedule *getSchedule() const { return _fp_schedule_uo; }
+
+  const double getOutputInventoryTime() const { return _output_inventory_time; }
+
 protected:
   /**
    * Set the nuclear data for FISPACT
@@ -270,6 +282,8 @@ protected:
 
   /// Number of FISPACT inventories
   uint64_t _n_inventories;
+
+  double _output_inventory_time;
 
   ///
   UserObjectName _fp_schedule_uo_name;
