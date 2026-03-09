@@ -94,8 +94,8 @@ protected:
     _mesh = _factory.createUnique<FileMesh>("FileMesh", "name1", mesh_params);
     _mesh->setMeshBase(_mesh->buildMeshBaseObject());
     _mesh->buildMesh();
-    _mesh->getMesh().prepare_for_use();
     _mesh->init();
+    _mesh->prepare(&_mesh->getMesh());
 
     InputParameters problem_params = _factory.getValidParams("FispactProblem");
     problem_params.set<MooseMesh *>("mesh") = _mesh.get();
