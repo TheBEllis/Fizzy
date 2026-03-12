@@ -304,7 +304,8 @@ void FispactProblem::externalSolve() {
         // If the energy groups of our nuclear data and input flux do not match,
         // convert input flux to energy grouping of loaded nuclear data
         if (_convert_energy_groups) {
-          convertFluxEnergyGroups(input_flux);
+          convertFluxEnergyGroups(input_flux,
+                                  _fp_flux_input_uo->getFluxEnergyGroups());
         }
 
         const FispactMaterial &input_material =
@@ -426,17 +427,16 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
   }
 }
 
-void FispactProblem::convertFluxEnergyGroups(std::vector<double> &input_flux) {
-  const std::vector<double> &input_energy_groups =
-      _fp_flux_input_uo->getFluxEnergyGroups();
+void FispactProblem::convertFluxEnergyGroups(
+    std::vector<double> &flux, const std::vector<double> &input_energy_groups) {
   switch (getParam<MooseEnum>("conversion_type")) {
   case 0: // LETHARGY
-    input_flux = _fp_ctxt->getUtils().GroupConvertByLethargy(
-        input_energy_groups, input_flux, _flux_energy_groups);
+    flux = _fp_ctxt->getUtils().GroupConvertByLethargy(
+        input_energy_groups, flux, _flux_energy_groups);
 
   case 1: // ENERGY
-    input_flux = _fp_ctxt->getUtils().GroupConvertByEnergy(
-        input_energy_groups, input_flux, _flux_energy_groups);
+    flux = _fp_ctxt->getUtils().GroupConvertByEnergy(input_energy_groups, flux,
+                                                     _flux_energy_groups);
   }
 }
 
