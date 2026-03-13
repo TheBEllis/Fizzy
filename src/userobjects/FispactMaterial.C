@@ -117,11 +117,11 @@ FispactMaterial::FispactMaterial(const InputParameters &parameters)
   } else if (density_units == "kg/m3") {
     _density /= 1000;
 
-  } else if (density_units == "atoms/cm3") {
+  } else if (density_units == "atom/cm3") {
     _density *= average_molar_mass / _avogadro;
   }
 
-  else if (density_units == "atoms/b-cm") {
+  else if (density_units == "atom/b-cm") {
     _density *= average_molar_mass * 1e24 / _avogadro;
   }
 
