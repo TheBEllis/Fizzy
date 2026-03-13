@@ -4,6 +4,8 @@
 #include "GeneralUserObject.h"
 #include <unordered_map>
 
+class FispactProblem;
+
 class FispactMaterial : public GeneralUserObject, public BlockRestrictable {
 public:
   static InputParameters validParams();
@@ -13,6 +15,8 @@ public:
   virtual void initialize() {}
   virtual void finalize() {}
   virtual void execute() {}
+
+  FispactProblem &getFispactProblem() const;
 
   /**
    * Return a vector of Z or Zai numbers, depending on whether we are using
@@ -43,13 +47,27 @@ public:
    */
   const std::string &getMaterialType() const { return _material_type; }
 
+  double getAverageMolarMass(const std::vector<std::string> &nuclide_names,
+                             const std::vector<double> &nuclide_fractions,
+                             const std::string &fraction_type) const;
+
+  void
+  convertFromAtomToMassFraction(const std::vector<std::string> &nuclide_names,
+                                std::vector<double> &nuclide_fractions,
+                                const double average_molar_mass);
+
 protected:
+  FispactProblem &_fispact_problem;
   //
   std::unordered_map<std::string, double> _nuclide_fraction_map;
+
+  const std::unordered_map<std::string, double> &_molar_mass_map;
 
   // Density of the fispact material
   double _density;
 
   //
   const std::string _material_type;
+
+  const double _avogadro;
 };

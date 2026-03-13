@@ -156,6 +156,10 @@ FispactProblem::FispactProblem(const InputParameters &params)
                "with BOOST. No communication occuring.");
 #endif
   }
+
+  /// Need to load molar masses here, as FispactMaterial will need molar mass
+  /// data in its constructor
+  loadMolarMasses();
 }
 
 FispactProblem::~FispactProblem() {
@@ -166,12 +170,12 @@ FispactProblem::~FispactProblem() {
 void FispactProblem::initialSetup() {
   ExternalProblem::initialSetup();
 
-  _fp_ctxt = createFispactContext(getParam<bool>("mock_fispact"));
+  callFispactFactory();
+
   if (!_fp_ctxt) {
     mooseError("Fispact context could not be initialised! Maybe user has asked "
                "to use mock fispact outside of unit tests?");
   }
-
   // Init FISPACT
   _fp_ctxt->globalInitialise();
 
@@ -180,8 +184,6 @@ void FispactProblem::initialSetup() {
   setNuclearData();
 
   checkForEnergyGroupConsistency();
-
-  loadMolarMasses();
 
   setPhotonBins(utils::energy_groups::gamma_groups[_n_photon_bins]);
 
@@ -448,7 +450,6 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
                                          const std::vector<double> &flux,
                                          const double &volume,
                                          IFispactInputDataBase &input) const {
-
   /// Set neutron flux
   input.setFlux(_flux_energy_groups, flux);
   input.setFluxWallLoading(1.0);
@@ -501,13 +502,12 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
     /// input fuel
     for (const auto &[isotope_name, mass_fraction] : nuclideFractionMap) {
 
-      // Our mass fraction is in percentage, so we need to divide by 100
-      double zai_mass = total_mass_grams * (mass_fraction / 100);
+      double zai_mass = total_mass_grams * (mass_fraction);
 
       zais.push_back(_fp_ctxt->getUtils().GetZai(isotope_name));
 
       atoms.push_back(
-          getNumAtoms(zai_mass, _molar_mass_map.at(zais.back()), AVOGADRO));
+          getNumAtoms(zai_mass, _molar_mass_map.at(isotope_name), AVOGADRO));
     }
     input.setFuel(zais, atoms);
   }
@@ -743,9 +743,8 @@ void FispactProblem::loadMolarMasses() {
 
   for (int i = 0; i < molar_masses.size(); i++) {
 
-    int zai = _fp_ctxt->getUtils().GetZai(element_symbols[i]);
-    std::pair<int, double> key_value =
-        std::pair<int, double>(zai, molar_masses[i]);
+    std::pair<std::string, double> key_value =
+        std::pair<std::string, double>(element_symbols[i], molar_masses[i]);
     _molar_mass_map.insert(key_value);
   }
 }
@@ -801,7 +800,8 @@ void FispactProblem::read_material_xml_data() {
       nuclides.push_back(std::string(nuclide.attribute("name").value()));
 
       if (nuclide.attribute("wo")) {
-        nuclide_fractions.push_back(std::stod(nuclide.attribute("wo").value()));
+        nuclide_fractions.push_back(std::stod(nuclide.attribute("wo").value()) /
+                                    100);
       } else if (nuclide.attribute("ao")) {
 
         nuclide_fractions.push_back(
@@ -821,37 +821,21 @@ void FispactProblem::read_material_xml_data() {
                  "parsing material xml");
     }
 
+    std::string fraction_type;
     if (all_ao) {
-      double sum_fraction_time_atomic_weight = 0;
-
-      std::vector<double> molar_masses;
-
-      for (int i = 0; i < nuclides.size(); i++) {
-        int zai = _fp_ctxt->getUtils().GetZai(nuclides.at(i));
-        molar_masses.push_back(_molar_mass_map.at(zai));
-        sum_fraction_time_atomic_weight +=
-            molar_masses.back() * abs(nuclide_fractions.at(i));
-      }
-
-      for (int i = 0; i < nuclides.size(); i++) {
-        nuclide_fractions[i] *=
-            -1 * molar_masses.at(i) / sum_fraction_time_atomic_weight;
+      fraction_type = "ao";
+      for (auto &fraction : nuclide_fractions) {
+        fraction = -fraction;
       }
     }
-
-    if (density_units == "kg/m3") {
-      density /= 1000;
+    if (all_wo) {
+      fraction_type = "wo";
     }
-    // TODO
-    if (density_units == "atom/b-cm") {
-      if (all_ao) {
-      }
 
-      if (all_wo) {
-      }
-    }
     params.set<double>("density") = density;
     params.set<MooseEnum>("material_type") = "FUEL";
+    params.set<MooseEnum>("fraction_type") = fraction_type;
+    params.set<MooseEnum>("density_units") = density_units;
     params.set<std::vector<SubdomainName>>("block") = {material_name};
     params.set<std::vector<std::string>>("nuclides") = nuclides;
     params.set<std::vector<double>>("nuclide_fraction") = nuclide_fractions;
@@ -954,4 +938,10 @@ void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
   hdf5_utils::write_dataset_lowlevel(file_id, dataset_name.c_str(), ndim,
                                      bin_dataset_dims, H5T_NATIVE_DOUBLE,
                                      photon_bins.data(), parallel);
+}
+
+const double FispactProblem::avogadroNumber() const { return AVOGADRO; }
+
+void FispactProblem::callFispactFactory() {
+  _fp_ctxt = createFispactContext(getParam<bool>("mock_fispact"));
 }

@@ -2,6 +2,7 @@
 
 #include "ExternalProblem.h"
 
+#include "FispactContextBase.h"
 #include "FispactFactory.h"
 #include "FispactFluxInput.h"
 #include "FispactMaterial.h"
@@ -39,6 +40,7 @@ public:
   void timestepSetup() override;
 
   /**
+   *
    * Calculates the total strength of one elements photon source term
    * @param[in] element a ptr to the libmesh element whose strength we are
    * calculating
@@ -80,6 +82,21 @@ public:
   const FispactSchedule *getSchedule() const { return _fp_schedule_uo; }
 
   const double getOutputInventoryTime() const { return _output_inventory_time; }
+
+  const std::unordered_map<std::string, double> &getMolarMassMap() {
+    return _molar_mass_map;
+  }
+
+  const double avogadroNumber() const;
+
+  const FispactContextBase *getFpContext() const { return _fp_ctxt.get(); }
+
+  /**
+   * Load in molar mass data from HDF5 file set using input params
+   */
+  void loadMolarMasses();
+
+  void callFispactFactory();
 
 protected:
   /**
@@ -193,11 +210,6 @@ protected:
    * given material
    */
   std::vector<double> getMaterialAtoms(const FispactMaterial &material);
-
-  /**
-   * Load in molar mass data from HDF5 file set using input params
-   */
-  void loadMolarMasses();
 
   /**
    * Method to calculate the number of atoms in a given mass of substance
@@ -328,7 +340,7 @@ protected:
   const std::string &_molar_mass_data_filename;
 
   /// Map from element ZAI to molar mass (g/mol)
-  std::unordered_map<int, double> _molar_mass_map;
+  std::unordered_map<std::string, double> _molar_mass_map;
 
   /// Map from global element id to "local element id"
   std::unordered_map<uint64_t, uint64_t> _local_elem_index;

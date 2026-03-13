@@ -262,7 +262,12 @@ void read_string(hid_t obj_id, const char *name,
   /// Split vector of chars into strings of length slen
   for (size_t i = 0; i < buffer.size(); i++) {
     std::string s(char_buff.data() + i * slen, slen);
-    s.erase(s.find_last_not_of("\0 ") + 1);
+
+    auto pos = s.find_last_not_of(std::string("\0 ", 2));
+    if (pos != std::string::npos)
+      s.erase(pos + 1);
+    else
+      s.clear();
     buffer[i] = std::move(s);
   }
 
