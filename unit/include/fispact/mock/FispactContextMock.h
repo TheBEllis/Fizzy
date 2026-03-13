@@ -67,9 +67,22 @@ class IMockFispactUtils : public IFispactUtilsBase {
 public:
   IMockFispactUtils() : IFispactUtilsBase() {}
 
-  virtual int GetZai(std::string nuclidename) { return 1; }
+  virtual int GetZai(std::string nuclidename) const {
+    if (nuclidename == "H1") {
+      return 4;
+    }
 
-  virtual int GetAtomicNumberFromElementName(std::string elementname) {
+    else if (nuclidename == "H2") {
+      return 5;
+    }
+
+    else if (nuclidename == "He3") {
+      return 6;
+    }
+    return -1;
+  }
+
+  virtual int GetAtomicNumberFromElementName(std::string elementname) const {
     return 1;
   }
 

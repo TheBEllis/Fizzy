@@ -103,12 +103,14 @@ protected:
     problem_params.set<UserObjectName>("fispact_schedule_uo") = "name2";
     problem_params.set<UserObjectName>("fispact_nuclear_data_uo") = "name2";
     problem_params.set<UserObjectName>("fispact_input_flux_uo") = "name2";
-    problem_params.set<FileName>("molar_mass_data") = "name2";
+    problem_params.set<FileName>("molar_mass_data") = "molar_mass_mock.h5";
     _fe_problem = _factory.create<FispactProblem>("FispactProblem", "problem",
                                                   problem_params);
 
     _fe_problem->createQRules(libMesh::QGAUSS, libMesh::FIRST, libMesh::FIRST,
                               libMesh::FIRST);
+
+    _fe_problem->callFispactFactory();
 
     _app->actionWarehouse().problemBase() = _fe_problem;
   }

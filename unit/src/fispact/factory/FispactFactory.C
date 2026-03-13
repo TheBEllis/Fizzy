@@ -6,5 +6,5 @@
 
 std::unique_ptr<FispactContextBase> createFispactContext(bool make_mock) {
 
-  return std::make_unique<FispactContext>();
+  return std::make_unique<FispactContextMock>();
 }
