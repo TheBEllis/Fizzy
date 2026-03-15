@@ -286,6 +286,11 @@ void FispactProblem::externalSolve() {
 
   if (!_solved) {
 
+    const auto &subdomain_names = getParam<std::vector<SubdomainName>>("block");
+    auto mesh_subdomains_vec =
+        MooseMeshUtils::getSubdomainIDs(_mesh, subdomain_names);
+    std::set<SubdomainID> mesh_subdomains(mesh_subdomains_vec.begin(),
+                                          mesh_subdomains_vec.end());
     int counter = 1;
     for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
@@ -301,7 +306,8 @@ void FispactProblem::externalSolve() {
       _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
                << std::endl;
 
-      if (isFlux(input_flux)) {
+      if (isFlux(input_flux) &&
+          mesh_subdomains.count(element->subdomain_id())) {
 
         // If the energy groups of our nuclear data and input flux do not match,
         // convert input flux to energy grouping of loaded nuclear data
