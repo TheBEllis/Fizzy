@@ -1,7 +1,8 @@
 [Mesh]
   [fmg]
     type = FileMeshGenerator
-    file = "../../geometry/cube.e"
+    #file = "../../geometry/cube.e"
+    file = "../../../SINBAD/FNGFizzy/geometry/Neutrons/fng_mesh.e"
   []
 []
 
@@ -38,14 +39,16 @@
     type = FispactMaterial
     material_type = FUEL
     nuclides = "B10 B11 C12 C13 Si28 V50 V51 Cr50 Cr52 Cr53 Cr54 Mn55 Fe54 Fe56 Fe57 Fe58 Co59 Ni58 Ni60 Ni61 Ni62 Ni64 Mo92 Mo94 Mo95 Mo96 Mo97 Mo98 Mo100 Cu63 Cu65"
-    nuclide_fraction = "0.000693 0.002807 0.039520273803427465 0.000479726196572539 0.47 0.0003921925373160739 0.15960780746268394 0.73 14.07 1.6 0.4 1.14 3.95 62.51 1.46 0.2 0.14 7.31 2.79 0.12 0.38 0.1 0.2974760972643644 0.1906159496693566 0.33284984504744625 0.3533051306488447 0.20516502475964524 0.5254922939545649 0.21509565865577795 0.06 0.03"
+    nuclide_fraction = "0.00000693 0.0000281 0.000395203 0.00000479726 0.0047 0.00000392193 0.00159608 0.0073 0.1407 0.016 0.004 0.0114 0.0395 0.6251 0.0146 0.002 0.0014 0.0731 0.0279 0.0012 0.0038 0.001 0.00297476 0.00190616 0.00332850 0.00353305 0.00205165 0.00525492 0.00215096 0.0006 0.0003"
+    fraction_type = 'wo'
+    density_units = 'g/cm3'
     block = 1
     density = 8
   []
 
   [endf_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/Projects/FispactNuclearData/"
+    base_path = "/home/bill/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
     #ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
     ND_XS_ENDFB_KEY = "endfb80-n.bin"
@@ -53,6 +56,13 @@
     ND_SF_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80sfy"
     ND_DK_ENDF_KEY = "ENDFB80data/decay"
     ND_ABSORP_KEY = "decay/abs_2012"
+  []
+[]
+
+[Postprocessors]
+  [photon_emission]
+    type = ElementPhotonEmission
+    element_ids = '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47'
   []
 []
 
