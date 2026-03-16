@@ -1,4 +1,5 @@
 #include "FispactSchedule.h"
+#include "MooseError.h"
 
 registerMooseObject("FizzyApp", FispactSchedule);
 
@@ -19,8 +20,9 @@ FispactSchedule::FispactSchedule(const InputParameters &parameters)
       _flux_amplitude(getParam<std::vector<double>>("flux_amplitude")),
       _times(getParam<std::vector<double>>("times")) {
   // Check vectors passed in are the right size
-  mooseAssert(_times.size() == _flux_amplitude.size(),
-              "The length of the flux_schdule and times must be equal");
+  if (_times.size() != _flux_amplitude.size()) {
+    mooseError("The length of the flux_schdule and times must be equal");
+  }
 
   _cumulative_times.resize(_times.size());
   std::inclusive_scan(_times.begin(), _times.end(), _cumulative_times.begin());
