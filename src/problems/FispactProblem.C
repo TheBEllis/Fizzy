@@ -20,7 +20,7 @@
 #include <mpi.h>
 
 // Avogadro's number
-#define AVOGADRO 6.0221408e+23
+#define AVOGADRO 6.02214076e+23
 
 #define MOLAR_MASS_DATASET_DIMS 1
 
