@@ -107,8 +107,10 @@ FispactMaterial::FispactMaterial(const InputParameters &parameters)
     average_molar_mass =
         getAverageMolarMass(nuclide_names, nuclide_fractions, fraction_type);
 
-    convertFromAtomToMassFraction(nuclide_names, nuclide_fractions,
-                                  average_molar_mass);
+    if (fraction_type == "ao") {
+      convertFromAtomToMassFraction(nuclide_names, nuclide_fractions,
+                                    average_molar_mass);
+    }
   }
 
   /// If density is not given in g/cm3, we have some conversions to do
