@@ -52,25 +52,12 @@ FispactNuclearDataPaths::getNuclearDataPathMap() {
 
 void FispactNuclearDataPaths::loadNuclearDataPaths() {
 
-  std::vector<std::string> nuclear_data{"ND_IND_NUC_KEY",
-                                        "ND_HAZARDS_KEY",
-                                        "ND_ABSORP_KEY",
-                                        "ND_CLEAR_KEY",
-                                        "ND_A2DATA_KEY",
-                                        "ND_ENBINS_KEY",
-                                        "ND_DECAY_KEY",
-                                        "ND_DK_ENDF_KEY",
-                                        "ND_PROB_TAB_KEY",
-                                        "ND_ASSCFY_KEY",
-                                        "ND_FISSYLD_KEY",
-                                        "ND_FY_ENDF_KEY",
-                                        "ND_SF_ENDF_KEY",
-                                        "ND_SP_ENDF_KEY",
-                                        "ND_XS_EXTRA_KEY"
-                                        "ND_CROSSEC_KEY",
-                                        "ND_CROSSUNC_KEY"
-                                        "ND_XS_ENDF_KEY",
-                                        "ND_XS_ENDFB_KEY"};
+  std::vector<std::string> nuclear_data{
+      "ND_IND_NUC_KEY",  "ND_HAZARDS_KEY", "ND_ABSORP_KEY",   "ND_CLEAR_KEY",
+      "ND_A2DATA_KEY",   "ND_ENBINS_KEY",  "ND_DECAY_KEY",    "ND_DK_ENDF_KEY",
+      "ND_PROB_TAB_KEY", "ND_ASSCFY_KEY",  "ND_FISSYLD_KEY",  "ND_FY_ENDF_KEY",
+      "ND_SF_ENDF_KEY",  "ND_SP_ENDF_KEY", "ND_XS_EXTRA_KEY", "ND_CROSSEC_KEY",
+      "ND_CROSSUNC_KEY", "ND_XS_ENDF_KEY", "ND_XS_ENDFB_KEY"};
   for (auto &data : nuclear_data) {
     if (isParamValid(data)) {
       /// check path exists
@@ -81,7 +68,7 @@ void FispactNuclearDataPaths::loadNuclearDataPaths() {
       }
 
       if (data == ("ND_XS_ENDF_KEY")) {
-        if (isParamValid("ND_XS_ENDFB_KEY")) {
+        if (isParamSetByUser("ND_XS_ENDFB_KEY")) {
           paramWarning(
               "ND_XS_ENDF_KEY",
               "User has provided both compressed xs and uncompressed xs, "
