@@ -55,6 +55,10 @@ public:
     _input.setSchedule(deltatime, fluxamp);
   }
 
+  virtual std::pair<std::vector<double>, std::vector<double>> getSchedule() {
+    return _input.getSchedule();
+  }
+
   virtual void setAtomsThreshold(double threshold) {
     _input.setAtomsThreshold(threshold);
   }
@@ -78,6 +82,10 @@ public:
     return _output.getGammaSpectrumBins(inv_index);
   };
 
+  virtual std::vector<double> getGammaSpectrumBoundaries(int inv_index) {
+    return _output.getGammaSpectrumBoundaries(inv_index);
+  };
+
   fispact::OutputData &getOutput() { return _output; };
 
 private:
@@ -90,7 +98,21 @@ class IFispactUtils : public IFispactUtilsBase {
 
 public:
   IFispactUtils(fispact::FispactMonitor &monitor)
-      : IFispactUtilsBase(), _monitor(monitor) {}
+      : IFispactUtilsBase(), _monitor(monitor) {
+
+    _neutron_energy_groups_map[709] = fispact::groups::G709();
+    _neutron_energy_groups_map[1102] = fispact::groups::G1102();
+
+    _photon_energy_groups_map[22] = {0.0,   1.0e4, 1.0e5, 2.0e5, 4.0e5, 1.0e6,
+                                     1.5e6, 2.0e6, 2.5e6, 3.0e6, 3.5e6, 4.0e6,
+                                     4.5e6, 5.0e6, 5.5e6, 6.0e6, 6.5e6, 7.0e6,
+                                     7.5e6, 8.0e6, 1.0e7, 1.2e7, 1.4e7};
+    _photon_energy_groups_map[24] = {
+        1.000e-11, 1.000e+4, 2.000e+4, 5.000e+4, 1.000e+5, 2.000e+5, 3.000e+5,
+        4.000e+5,  6.000e+5, 8.000e+5, 1.000e+6, 1.220e+6, 1.440e+6, 1.660e+6,
+        2.000e+6,  2.500e+6, 3.000e+6, 4.000e+6, 5.000e+6, 6.500e+6, 8.000e+6,
+        1.000e+7,  1.200e+7, 1.400e+7, 2.000e+7};
+  }
 
   virtual int GetZai(std::string nuclidename) {
     return fispact::util::GetZai(_monitor, nuclidename);
@@ -98,6 +120,14 @@ public:
 
   virtual int GetAtomicNumberFromElementName(std::string elementname) {
     return fispact::util::GetAtomicNumberFromElementName(_monitor, elementname);
+  }
+
+  virtual std::vector<double> getNeutronEnergyBounds(size_t n_bins) {
+    return _neutron_energy_groups_map[n_bins];
+  }
+
+  virtual std::vector<double> getPhotonEnergyBounds(size_t n_bins) {
+    return _photon_energy_groups_map[n_bins];
   }
 
   virtual std::vector<double>
@@ -118,6 +148,8 @@ public:
 
 private:
   fispact::FispactMonitor &_monitor;
+  std::unordered_map<size_t, std::vector<double>> _neutron_energy_groups_map;
+  std::unordered_map<size_t, std::vector<double>> _photon_energy_groups_map;
 };
 
 class FispactContext : public FispactContextBase {
@@ -239,6 +271,7 @@ public:
       }
 
       if (data == "ND_XS_ENDF_KEY") {
+        std::cout << "HERE" << std::endl;
         nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, path);
         continue;
       }

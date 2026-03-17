@@ -7,9 +7,11 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <numeric>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -185,7 +187,7 @@ void FispactProblem::initialSetup() {
 
   checkForEnergyGroupConsistency();
 
-  setPhotonBins(utils::energy_groups::gamma_groups[_n_photon_bins]);
+  setPhotonBins(_fp_ctxt->getUtils().getPhotonEnergyBounds(_n_photon_bins));
 
   /// Set _n_inventories
   _n_inventories = _fp_schedule_uo->getTimes().size();
@@ -466,7 +468,7 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
   input.setDensity(density);
 
   /// Set atoms threshold
-  input.setAtomsThreshold(1.0e3);
+  input.setAtomsThreshold(1.0e1);
 
   double total_mass_grams = density * volume;
 
@@ -518,7 +520,7 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
     input.setFuel(zais, atoms);
   }
 
-  double flux_sum = std::reduce(flux.begin(), flux.end());
+  double flux_sum = std::accumulate(flux.begin(), flux.end(), 0.0);
 
   setFispactSchedule(input, volume, flux_sum);
 }
@@ -760,7 +762,7 @@ void FispactProblem::checkForEnergyGroupConsistency() {
 
   if (_fp_flux_input_uo->getNumEnergyGroups() != n_nd_energy_groups) {
     _flux_energy_groups =
-        utils::energy_groups::neutron_groups[n_nd_energy_groups];
+        _fp_ctxt->getUtils().getNeutronEnergyBounds(n_nd_energy_groups);
     _convert_energy_groups = true;
 
     std::string conversion_type = getParam<MooseEnum>("conversion_type");

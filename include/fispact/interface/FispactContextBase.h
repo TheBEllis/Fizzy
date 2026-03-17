@@ -25,12 +25,16 @@ public:
   virtual void setSchedule(const std::vector<double> &deltatime,
                            const std::vector<double> &fluxamp) = 0;
 
+  virtual std::pair<std::vector<double>, std::vector<double>> getSchedule() = 0;
+
   virtual void setAtomsThreshold(double threshold) = 0;
 };
 
 class IFispactOutputDataBase {
 public:
   virtual std::vector<double> getGammaSpectrumBins(int inv_index) = 0;
+
+  virtual std::vector<double> getGammaSpectrumBoundaries(int inv_index) = 0;
 };
 
 class IFispactUtilsBase {
@@ -38,6 +42,10 @@ public:
   virtual int GetZai(std::string nuclidename) = 0;
 
   virtual int GetAtomicNumberFromElementName(std::string elementname) = 0;
+
+  virtual std::vector<double> getNeutronEnergyBounds(size_t n_groups) = 0;
+
+  virtual std::vector<double> getPhotonEnergyBounds(size_t n_groups) = 0;
 
   virtual std::vector<double>
   GroupConvertByEnergy(const std::vector<double> &inbounds,
