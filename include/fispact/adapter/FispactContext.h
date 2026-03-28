@@ -63,6 +63,10 @@ public:
     _input.setAtomsThreshold(threshold);
   }
 
+  virtual void setSolverTolerance(double rtol, double atol) {
+    _input.setSolverTolerance(rtol, atol);
+  }
+
   fispact::InputData &getInput() { return _input; };
 
 private:

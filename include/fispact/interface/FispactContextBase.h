@@ -28,6 +28,8 @@ public:
   virtual std::pair<std::vector<double>, std::vector<double>> getSchedule() = 0;
 
   virtual void setAtomsThreshold(double threshold) = 0;
+
+  virtual void setSolverTolerance(double rtol, double atol) = 0;
 };
 
 class IFispactOutputDataBase {

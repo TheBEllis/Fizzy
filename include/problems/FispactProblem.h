@@ -98,7 +98,6 @@ public:
 
   void callFispactFactory();
 
-protected:
   /**
    * Set the nuclear data for FISPACT
    * @param[in] nd_base_path The directory containing the various nuclear data
@@ -246,6 +245,7 @@ protected:
    */
   const std::string generateInterprocessName();
 
+protected:
   /// -- Interprocess bits --
 #ifdef LIBMESH_HAVE_BOOST
   bi::managed_shared_memory _segment;
@@ -344,6 +344,11 @@ protected:
 
   /// Map from global element id to "local element id"
   std::unordered_map<uint64_t, uint64_t> _local_elem_index;
+
+  /// Absolute tolerance for FISPACT solver
+  double _atol;
+  /// Relative tolerance for FISPACT solver
+  double _rtol;
 
   // std::unordered_map<size_t, std::vector<double>> _neutron_group_map = {
   //     {100, fp::groups::G100()},

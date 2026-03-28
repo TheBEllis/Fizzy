@@ -108,6 +108,9 @@ InputParameters FispactProblem::validParams() {
   params.addParam<double>("output_inventory_time",
                           "When using the Steady executioner, which inventory "
                           "step should be placed in interprocess data");
+
+  params.addParam<double>("rtol", 2e-3, "Relative FISPACT solver tolerance.");
+  params.addParam<double>("atol", 1e4, "Absolute FISPACT solver tolerance.");
   return params;
 }
 
@@ -125,7 +128,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _write_photon_flux(getParam<bool>("write_photon_flux")),
       _comm_photon_flux(getParam<bool>("comm_photon_flux")), _solved(false),
       _interprocess_segment_name(generateInterprocessName()),
-      _molar_mass_data_filename(getParam<FileName>("molar_mass_data")) {
+      _molar_mass_data_filename(getParam<FileName>("molar_mass_data")),
+      _atol(getParam<double>("atol")), _rtol(getParam<double>("rtol")) {
 
   /**
    * If write_photon_flux was set to true then check that user input a
@@ -462,6 +466,8 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
   input.setFlux(_flux_energy_groups, flux);
   input.setFluxWallLoading(1.0);
   input.setFluxName("neutrons");
+
+  input.setSolverTolerance(_rtol, _atol);
 
   /// Get density from mat density, in g/cm^3!
   double density = material.getDensity();
