@@ -14,6 +14,76 @@
 #include "fispactoutputdata.hpp"
 #include "fispactutil.hpp"
 
+inline int
+convertFispactEnum(IFispactOutputDataBase::FispactOutputs output_enum) {
+  if (output_enum ==
+      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT) {
+    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT;
+  }
+  if (output_enum ==
+      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME) {
+    return FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME;
+  }
+  if (output_enum ==
+      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT) {
+    return FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT;
+  }
+  return -1;
+}
+
+class FispactOutputNuclideData : public FispactOutputNuclideDataBase {
+public:
+  explicit FispactOutputNuclideData(fispact::OutputNuclideData &nuclide_data)
+      : _nuclide_data(std::move(nuclide_data)) {}
+
+  virtual ~FispactOutputNuclideData() = default;
+
+  virtual std::string getElement() const { return _nuclide_data.getElement(); }
+
+  virtual std::string getState() const { return _nuclide_data.getState(); }
+
+  virtual int getIsotope() const { return _nuclide_data.getIsotope(); }
+
+  virtual int getZAI() const { return _nuclide_data.getZAI(); }
+
+  virtual double getHalfLife() const { return _nuclide_data.getHalfLife(); }
+  // The number of atoms
+  virtual double getAtoms() const { return _nuclide_data.getAtoms(); }
+  // The grams (g)
+  virtual double getGrams() const { return _nuclide_data.getGrams(); }
+  // The activity (Bq)
+  virtual double getActivity() const { return _nuclide_data.getActivity(); }
+  // The alpha fraction of the activity (Bq)
+  virtual double getAlphaActivity() const {
+    return _nuclide_data.getAlphaActivity();
+  }
+  // The beta fraction of the activity (Bq)
+  virtual double getBetaActivity() const {
+    return _nuclide_data.getBetaActivity();
+  }
+  // The gamma fraction of the activity (Bq)
+  virtual double getGammaActivity() const {
+    return _nuclide_data.getGammaActivity();
+  }
+  // The total heat (kW)
+  virtual double getTotalHeat() const { return _nuclide_data.getTotalHeat(); }
+  // The alpha heat (kW)
+  virtual double getAlphaHeat() const { return _nuclide_data.getAlphaHeat(); }
+  // The beta heat (kW)
+  virtual double getBetaHeat() const { return _nuclide_data.getBetaHeat(); }
+  // The gamma heat (kW)
+  virtual double getGammaHeat() const { return _nuclide_data.getGammaHeat(); }
+  // The dose rate (Sv/hr)
+  virtual double getDoseRate() const { return _nuclide_data.getDoseRate(); }
+  // The ingestion (Sv)
+  virtual double getIngestion() const { return _nuclide_data.getIngestion(); }
+  // The inhalation (Sv)
+  virtual double getInhalation() const { return _nuclide_data.getInhalation(); }
+
+private:
+  fispact::OutputNuclideData _nuclide_data;
+};
+
 // IFispactInputData
 class IFispactInputData : public IFispactInputDataBase {
 
@@ -90,7 +160,28 @@ public:
     return _output.getGammaSpectrumBoundaries(inv_index);
   };
 
+  virtual std::vector<std::unique_ptr<FispactOutputNuclideDataBase>>
+  getInventoryNuclides(int inventory_index) {
+
+    std::vector<fispact::OutputNuclideData> fispact_nuclide_data =
+        _output.getInventoryNuclides(inventory_index);
+
+    std::vector<std::unique_ptr<FispactOutputNuclideDataBase>> nuclide_data;
+    nuclide_data.reserve(fispact_nuclide_data.size());
+
+    for (fispact::OutputNuclideData &nuclide : fispact_nuclide_data) {
+      nuclide_data.push_back(
+          std::make_unique<FispactOutputNuclideData>(nuclide));
+    }
+    return nuclide_data;
+  }
+
   fispact::OutputData &getOutput() { return _output; };
+
+  virtual std::pair<std::vector<int>, std::vector<double>>
+  getSortedInventory(int inv_index, FispactOutputs key) const {
+    return _output.getSortedInventory(inv_index, convertFispactEnum(key));
+  }
 
 private:
   fispact::FispactMonitor &_monitor;

@@ -3,6 +3,50 @@
 #include <unordered_map>
 #include <vector>
 
+class FispactOutputNuclideDataBase {
+public:
+  virtual ~FispactOutputNuclideDataBase() = default;
+
+  virtual std::string getElement() const = 0;
+
+  virtual std::string getState() const = 0;
+
+  virtual int getIsotope() const = 0;
+
+  virtual int getZAI() const = 0;
+
+  // The half life (s)
+  virtual double getHalfLife() const = 0;
+  // The number of atoms
+  virtual double getAtoms() const = 0;
+  // The grams (g)
+  virtual double getGrams() const = 0;
+  // The activity (Bq)
+  virtual double getActivity() const = 0;
+  // The alpha fraction of the activity (Bq)
+  virtual double getAlphaActivity() const = 0;
+  // The beta fraction of the activity (Bq)
+  virtual double getBetaActivity() const = 0;
+  // The gamma fraction of the activity (Bq)
+  virtual double getGammaActivity() const = 0;
+  // The total heat (kW)
+  virtual double getTotalHeat() const = 0;
+  // The alpha heat (kW)
+  virtual double getAlphaHeat() const = 0;
+  // The beta heat (kW)
+  virtual double getBetaHeat() const = 0;
+  // The gamma heat (kW)
+  virtual double getGammaHeat() const = 0;
+  // The dose rate (Sv/hr)
+  virtual double getDoseRate() const = 0;
+  // The ingestion (Sv)
+  virtual double getIngestion() const = 0;
+  // The inhalation (Sv)
+  virtual double getInhalation() const = 0;
+
+private:
+};
+
 class IFispactInputDataBase {
 public:
   virtual void setFlux(const std::vector<double> &flux_energy_groups,
@@ -37,6 +81,30 @@ public:
   virtual std::vector<double> getGammaSpectrumBins(int inv_index) = 0;
 
   virtual std::vector<double> getGammaSpectrumBoundaries(int inv_index) = 0;
+
+  virtual std::vector<std::unique_ptr<FispactOutputNuclideDataBase>>
+  getInventoryNuclides(int inventory_index) = 0;
+
+  enum FispactOutputs {
+    FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME,
+    FISPACT_OUTPUT_DATA_INVENTORY_COOL_TIME,
+    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ACTIVITY,
+    FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_ACTIVITY,
+    FISPACT_OUTPUT_DATA_INVENTORY_BETA_ACTIVITY,
+    FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_ACTIVITY,
+    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT,
+    FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_HEAT,
+    FISPACT_OUTPUT_DATA_INVENTORY_BETA_HEAT,
+    FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT,
+    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS,
+    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ATOMS,
+    FISPACT_OUTPUT_DATA_INVENTORY_INGESTION,
+    FISPACT_OUTPUT_DATA_INVENTORY_INHALATION,
+    FISPACT_OUTPUT_DATA_INVENTORY_FLUX_AMP
+  };
+
+  virtual std::pair<std::vector<int>, std::vector<double>>
+  getSortedInventory(int inv_index, FispactOutputs key) const = 0;
 };
 
 class IFispactUtilsBase {
