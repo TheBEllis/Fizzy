@@ -1,6 +1,5 @@
 #include "FispactFactory.h"
 #include "FispactMaterial.h"
-#include "FispactProblem.h"
 
 #include <algorithm>
 #include <numeric>
@@ -9,7 +8,7 @@
 registerMooseObject("FizzyApp", FispactMaterial);
 
 InputParameters FispactMaterial::validParams() {
-  InputParameters params = GeneralUserObject::validParams();
+  InputParameters params = FispactUserObject::validParams();
   params += BlockRestrictable::validParams();
 
   params.addRequiredParam<std::vector<std::string>>(
@@ -41,8 +40,7 @@ InputParameters FispactMaterial::validParams() {
 }
 
 FispactMaterial::FispactMaterial(const InputParameters &parameters)
-    : GeneralUserObject(parameters), BlockRestrictable(this),
-      _fispact_problem(static_cast<FispactProblem &>(_fe_problem)),
+    : FispactUserObject(parameters), BlockRestrictable(this),
       _molar_mass_map(getFispactProblem().getMolarMassMap()),
       _density(getParam<double>("density")),
       _material_type(getParam<MooseEnum>("material_type")),

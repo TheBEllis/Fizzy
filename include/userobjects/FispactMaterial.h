@@ -1,12 +1,10 @@
 #pragma once
 
 #include "BlockRestrictable.h"
-#include "GeneralUserObject.h"
+#include "FispactUserObject.h"
 #include <unordered_map>
 
-class FispactProblem;
-
-class FispactMaterial : public GeneralUserObject, public BlockRestrictable {
+class FispactMaterial : public FispactUserObject, public BlockRestrictable {
 public:
   static InputParameters validParams();
 
@@ -57,7 +55,6 @@ public:
                                 const double average_molar_mass);
 
 protected:
-  FispactProblem &_fispact_problem;
   //
   std::unordered_map<std::string, double> _nuclide_fraction_map;
 
