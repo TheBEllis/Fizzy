@@ -27,10 +27,10 @@ public:
   virtual void finalize() {}
   virtual void execute() {}
 
-  void registerNuclideMetrics(
-      std::string &nuclide,
-      std::vector<nuclide_quantities::NuclideQuantitiesEnum> metric,
-      std::set<SubdomainID> &blocks);
+  void registerNuclideMetricRequest(
+      const std::string &nuclide,
+      const nuclide_quantities::NuclideQuantitiesEnum metric,
+      const std::set<SubdomainID> &blocks);
 
   void extractInventoryData(FispactContextBase &fp_context, size_t elem_id,
                             int inv_index);
@@ -62,8 +62,9 @@ public:
   class NuclideInventory {
   public:
     NuclideInventory(
-        std::string &nuclide_name, size_t n_inventories,
-        std::vector<nuclide_quantities::NuclideQuantitiesEnum> &quantities)
+        const std::string &nuclide_name, size_t n_inventories,
+        const std::vector<nuclide_quantities::NuclideQuantitiesEnum>
+            &quantities)
         : _nuclide_name(nuclide_name), _n_inventories(n_inventories),
           _quantities(quantities) {
       _n_metrics = _quantities.size();
@@ -102,9 +103,9 @@ public:
         if (quantity == _quantities[i]) {
           return i;
         }
-        throw std::runtime_error(
-            "Searching for nuclide quantity that is not stored.");
       }
+      throw std::runtime_error(
+          "Searching for nuclide quantity that is not stored.");
     }
 
     double &operator()(size_t inv_index,
@@ -118,7 +119,7 @@ public:
     size_t _n_inventories;
     size_t _n_metrics;
 
-    std::vector<nuclide_quantities::NuclideQuantitiesEnum> &_quantities;
+    std::vector<nuclide_quantities::NuclideQuantitiesEnum> _quantities;
     std::vector<double> _data;
   };
 
@@ -127,19 +128,19 @@ public:
   public:
     ElementInventory(size_t elem_id) : _elem_id(elem_id) {}
 
-    void insertNuclideMetricRequest(
-        std::string &name, size_t id, size_t n_inventories,
-        std::vector<nuclide_quantities::NuclideQuantitiesEnum> quantities) {
+    void registerNuclideMetricRequest(
+        const std::string &name, const size_t id, const size_t n_inventories,
+        const nuclide_quantities::NuclideQuantitiesEnum metric) {
 
       if (std::find(_nuclides.begin(), _nuclides.end(), id) ==
           _nuclides.end()) {
 
         _nuclides.push_back(id);
-        _nuclide_data.emplace_back(name, n_inventories, quantities);
+        _nuclide_data.emplace_back(
+            name, n_inventories,
+            std::vector<nuclide_quantities::NuclideQuantitiesEnum>(metric));
       } else {
-        for (auto &quantity : quantities) {
-          getNuclide(id).addQuantity(quantity);
-        }
+        getNuclide(id).addQuantity(metric);
       }
     }
 
@@ -152,6 +153,10 @@ public:
     }
 
     NuclideInventory &getNuclide(size_t n) {
+      return _nuclide_data[find_nuclide(n)];
+    }
+
+    const NuclideInventory &getNuclide(size_t n) const {
       return _nuclide_data[find_nuclide(n)];
     }
 
