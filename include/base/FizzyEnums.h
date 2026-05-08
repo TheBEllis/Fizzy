@@ -1,0 +1,45 @@
+#pragma once
+
+#include "MooseEnum.h"
+#include "MultiMooseEnum.h"
+
+MooseEnum getInventoryMetricsEnum();
+MooseEnum getNuclideMetricsEnum();
+
+namespace inventory_outputs {
+
+enum InventoryOutputsEnum {
+  INVENTORY_IRRAD_TIME,
+  INVENTORY_COOL_TIME,
+  INVENTORY_TOTAL_ACTIVITY,
+  INVENTORY_ALPHA_ACTIVITY,
+  INVENTORY_BETA_ACTIVITY,
+  INVENTORY_GAMMA_ACTIVITY,
+  INVENTORY_TOTAL_HEAT,
+  INVENTORY_ALPHA_HEAT,
+  INVENTORY_BETA_HEAT,
+  INVENTORY_GAMMA_HEAT,
+  INVENTORY_TOTAL_MASS,
+  INVENTORY_TOTAL_ATOMS,
+  INVENTORY_INGESTION,
+  INVENTORY_INHALATION,
+  INVENTORY_FLUX_AMP
+};
+};
+
+namespace nuclide_quantities {
+
+enum NuclideQuantitiesEnum {
+  ATOMS,
+  GRAMS,
+  ACTIVITY,
+  ALPHA_ACTIVITY,
+  BETA_ACTIVITY,
+  GAMMA_ACTIVITY,
+  TOTAL_HEAT,
+  ALPHA_HEAT,
+  BETA_HEAT,
+  GAMMA_HEAT,
+  DOSE
+};
+};
