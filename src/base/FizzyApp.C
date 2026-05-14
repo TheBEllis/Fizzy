@@ -26,8 +26,17 @@ void FizzyApp::registerAll(Factory &f, ActionFactory &af, Syntax &syntax) {
 
   /* register custom execute flags, action syntax, etc. here */
 
-  syntax.registerActionSyntax("AddPhotonSpectraVectorPPAllBlocks",
-                              "VectorPostprocessors/PhotonEmissionAllBlocks");
+  registerTask("add_inventory_manager", true);
+  addTaskDependency("add_inventory_manager", "add_aux_kernel");
+  addTaskDependency("add_inventory_manager", "add_user_object");
+
+  associateSyntaxInner(syntax, af);
+}
+
+void FizzyApp::associateSyntaxInner(Syntax &syntax,
+                                    ActionFactory &action_factory) {
+  registerSyntax("AddPhotonSpectraVectorPPAllBlocks",
+                 "VectorPostprocessors/PhotonEmissionAllBlocks");
 }
 
 void FizzyApp::registerApps() { registerApp(FizzyApp); }

@@ -1,3 +1,4 @@
+#pragma once
 #include "AuxKernel.h"
 #include "FispactInventoryManager.h"
 #include "FizzyEnums.h"

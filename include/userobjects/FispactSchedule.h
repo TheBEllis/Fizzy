@@ -16,6 +16,8 @@ public:
   std::vector<double> getFluxAmplitude();
   const std::vector<double> &getTimes() const;
   const std::vector<double> &getCumulativeTimes() const;
+  const size_t &getNumInventories() const;
+  const size_t &getNumSolutionInventories() const;
 
 protected:
   /// Vector of flux amplitudes
@@ -26,4 +28,10 @@ protected:
 
   /// Cumulative version of _times
   std::vector<double> _cumulative_times;
+
+  /// Total number of solution inventories (ignoring initial)
+  const size_t _n_solution_inventories;
+
+  /// Total number of FISPACT inventories including initial inventory
+  const size_t _n_inventories;
 };

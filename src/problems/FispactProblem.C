@@ -1,6 +1,8 @@
 #include "EnergyGroups.h"
+#include "FispactInventoryManager.h"
 #include "FispactProblem.h"
 //// PugiXML include
+#include "FizzyEnums.h"
 #include "pugixml.hpp"
 
 /// Cpp includes
@@ -22,7 +24,7 @@
 #include <mpi.h>
 
 // Avogadro's number
-#define AVOGADRO 6.02214076e+23
+constexpr double AVOGADRO = 6.02214076e+23;
 
 #define MOLAR_MASS_DATASET_DIMS 1
 
@@ -142,6 +144,13 @@ FispactProblem::FispactProblem(const InputParameters &params)
                      _photon_flux_filename);
   }
 
+  /// Set up local element index map
+  int local_elem_idx = 0;
+  for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
+    _local_elem_index.insert(
+        std::pair<int, int>(element->id(), local_elem_idx++));
+  }
+
   if (_comm_photon_flux) {
 
 #ifdef LIBMESH_HAVE_BOOST
@@ -193,29 +202,26 @@ void FispactProblem::initialSetup() {
 
   setPhotonBins(_fp_ctxt->getUtils().getPhotonEnergyBounds(_n_photon_bins));
 
-  /// Set _n_inventories
-  _n_inventories = _fp_schedule_uo->getTimes().size();
+  _n_inventories = &(_fp_schedule_uo->getNumInventories());
+
+  _n_solution_inventories = &(_fp_schedule_uo->getNumSolutionInventories());
+  ///
 
   /// Reserve space in our solution vector
   // _photon_energy_spectra.resize(
-  //     _mesh.nActiveLocalElem() * _n_inventories * _n_photon_bins, 0);
+  //     _mesh.nActiveLocalElem() * *_n_solution_inventories * _n_photon_bins,
+  //     0);
 
   _photon_energy_spectra = std::make_unique<PhotonSpectra>(
-      _n_inventories, _mesh.nActiveLocalElem(), _n_photon_bins);
+      *_n_solution_inventories, _mesh.nActiveLocalElem(), _n_photon_bins);
 
   /// Reserve space for element strengths vector
-  _element_strengths.resize(_mesh.nActiveLocalElem() * _n_inventories, 0);
+  _element_strengths.resize(
+      _mesh.nActiveLocalElem() * (*_n_solution_inventories), 0);
 
-  _local_domain_strength.resize(_n_inventories, 0);
+  _local_domain_strength.resize(*_n_solution_inventories, 0);
 
-  _total_domain_strength.reserve(_n_inventories);
-
-  /// Set up local element index map
-  int local_elem_idx = 0;
-  for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
-    _local_elem_index.insert(
-        std::pair<int, int>(element->id(), local_elem_idx++));
-  }
+  _total_domain_strength.reserve(*_n_solution_inventories);
 
   /// Check user has passed output_inventory_time, if problem is Steady and
   /// they wish to use distributed sampling
@@ -312,46 +318,67 @@ void FispactProblem::externalSolve() {
       _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
                << std::endl;
 
-      if (isFlux(input_flux) &&
-          mesh_subdomains.count(element->subdomain_id())) {
+      // if (isFlux(input_flux) &&
+      //     mesh_subdomains.count(element->subdomain_id())) {
 
-        // If the energy groups of our nuclear data and input flux do not match,
-        // convert input flux to energy grouping of loaded nuclear data
-        if (_convert_energy_groups) {
-          convertFluxEnergyGroups(input_flux,
-                                  _fp_flux_input_uo->getFluxEnergyGroups());
-        }
-
-        const FispactMaterial &input_material =
-            getElementMaterial(global_elem_id);
-
-        setFispactInputData(input_material, input_flux, element->volume(),
-                            _fp_ctxt->getInput());
-        /// Run FISPACT
-        _fp_ctxt->process();
-
-        /// Loop over number of inventories to get all data for current
-        /// element
-        for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
-
-          /// Vector to store photon energy spectra in photons/cc-s
-          std::vector<double> element_photon_energy_spectrum;
-
-          /// Calculated Fispact inventories start at index 1, 0 is reserved
-          /// for initial concentrations
-          convertGammaEvToCount(
-              _fp_ctxt->getOutput().getGammaSpectrumBins(inv_index + 1),
-              element_photon_energy_spectrum);
-
-          std::copy(element_photon_energy_spectrum.begin(),
-                    element_photon_energy_spectrum.end(),
-                    _photon_energy_spectra->spectrum_begin(
-                        inv_index, _local_elem_index[global_elem_id]));
-
-          insertElementStrength(inv_index, element,
-                                element_photon_energy_spectrum);
-        }
+      // If the energy groups of our nuclear data and input flux do not match,
+      // convert input flux to energy grouping of loaded nuclear data
+      if (_convert_energy_groups) {
+        convertFluxEnergyGroups(input_flux,
+                                _fp_flux_input_uo->getFluxEnergyGroups());
       }
+
+      const FispactMaterial &input_material =
+          getElementMaterial(global_elem_id);
+
+      setFispactInputData(input_material, input_flux, element->volume(),
+                          _fp_ctxt->getInput());
+
+      /// Run FISPACT
+      _fp_ctxt->process();
+
+      /// Loop over number of inventories to get all data for current
+      /// element
+      for (int inv_index = 0; inv_index < *_n_solution_inventories;
+           inv_index++) {
+
+        // if (global_elem_id == 20) {
+        //   auto sorted_inv = _fp_ctxt->getOutput().getSortedInventory(
+        //       inv_index, inventory_outputs::INVENTORY_TOTAL_ATOMS);
+        //   for (int i = 0; i < 10; i++) {
+        //     _console <<
+        //     _fp_ctxt->getUtils().getNuclideName(sorted_inv.first[i])
+        //              << ": " << sorted_inv.second[i] << std::endl;
+        //     ;
+        //   }
+        // }
+        // _console << std::endl;
+
+        /// Vector to store photon energy spectra in photons/cc-s
+        std::vector<double> element_photon_energy_spectrum;
+
+        /// Calculated Fispact inventories start at index 1, 0 is reserved
+        /// for initial concentrations
+        convertGammaEvToCount(
+            _fp_ctxt->getOutput().getGammaSpectrumBins(inv_index + 1),
+            element_photon_energy_spectrum);
+
+        std::copy(element_photon_energy_spectrum.begin(),
+                  element_photon_energy_spectrum.end(),
+                  _photon_energy_spectra->spectrum_begin(
+                      inv_index, _local_elem_index[global_elem_id]));
+
+        insertElementStrength(inv_index, element,
+                              element_photon_energy_spectrum);
+      }
+
+      // if inventory manager exists, store requested nuclide metrics
+      if (hasUserObject("inv_manager")) {
+        FispactInventoryManager &inv_manager =
+            getUserObject<FispactInventoryManager>("inv_manager");
+        inv_manager.extractInventoryData(*_fp_ctxt, global_elem_id);
+      }
+      // }
     }
     calculateLocalDomainStrength();
 
@@ -368,34 +395,37 @@ void FispactProblem::externalSolve() {
   }
 }
 
+size_t FispactProblem::getFispactInventoryIndexFromTime() {
+  const std::vector<double> &schedule_times =
+      _fp_schedule_uo->getCumulativeTimes();
+
+  double inventory_time =
+      isTransient() ? time() : getParam<double>("output_inventory_time");
+
+  auto schedule_iterator =
+      std::find(schedule_times.begin(), schedule_times.end(), inventory_time);
+
+  if (schedule_iterator == schedule_times.end()) {
+    mooseError("Current time " + std::to_string(inventory_time));
+  }
+
+  size_t inventory_idx =
+      std::distance(schedule_times.begin(), schedule_iterator);
+
+  // Fispact Inventory index "0" is the initial inventory
+  return inventory_idx + 1;
+}
+
 void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
   if (direction == ExternalProblem::Direction::FROM_EXTERNAL_APP) {
 
     if (_comm_photon_flux) {
 #ifdef LIBMESH_HAVE_BOOST
 
-      /// Find the the inventory index associated to time "time()"
-      const std::vector<double> &schedule_times =
-          _fp_schedule_uo->getCumulativeTimes();
-
-      double inventory_time;
-      if (!isTransient()) {
-        inventory_time = getParam<double>("output_inventory_time");
-
-      } else {
-        inventory_time = time();
-      }
-
-      auto schedule_iterator = std::find(schedule_times.begin(),
-                                         schedule_times.end(), inventory_time);
-
-      if (schedule_iterator == schedule_times.end()) {
-        mooseError("Current time " + std::to_string(inventory_time) +
-                   " does not match any entry in the FISPACT schedule. Cannot "
-                   "do interprocess communication");
-      }
-      size_t inventory_idx =
-          std::distance(schedule_times.begin(), schedule_iterator);
+      /// Find the the inventory index associated with current time
+      /// -1 required due to indexing differences between the stored photon
+      /// spectra, and FISPACTs own indexing scheme
+      size_t photon_spectra_idx = getFispactInventoryIndexFromTime() - 1;
 
       /// Calculate TotalDomainStrength
       getTotalDomainStrength();
@@ -415,20 +445,20 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
       _photon_sharing_instance->_is_setup = false;
 
       _photon_sharing_instance->setPhotonSpectra(
-          _photon_energy_spectra->time_begin(inventory_idx),
-          _photon_energy_spectra->time_end(inventory_idx));
+          _photon_energy_spectra->time_begin(photon_spectra_idx),
+          _photon_energy_spectra->time_end(photon_spectra_idx));
 
       _photon_sharing_instance->setElementStrengths(
           _element_strengths.begin() +
-              (inventory_idx * _mesh.nActiveLocalElem()),
+              (photon_spectra_idx * _mesh.nActiveLocalElem()),
           _element_strengths.begin() +
-              (inventory_idx * _mesh.nActiveLocalElem()) +
+              (photon_spectra_idx * _mesh.nActiveLocalElem()) +
               _mesh.nActiveLocalElem());
 
       _photon_sharing_instance->setLocalDomainStrength(
-          _local_domain_strength[inventory_idx]);
+          _local_domain_strength[photon_spectra_idx]);
       _photon_sharing_instance->setTotalDomainStrength(
-          _total_domain_strength[inventory_idx]);
+          _total_domain_strength[photon_spectra_idx]);
 
 #else
       mooseError("_comm_photon_flux is set to true but libmesh was not
@@ -653,7 +683,7 @@ void FispactProblem::insertElementStrength(
 
 void FispactProblem::calculateLocalDomainStrength() {
 
-  for (int inv_index = 0; inv_index < _n_inventories; inv_index++) {
+  for (int inv_index = 0; inv_index < *_n_solution_inventories; inv_index++) {
     for (const libMesh::Elem *element : *_mesh.getActiveLocalElementRange()) {
 
       double element_strength;
@@ -876,7 +906,7 @@ void FispactProblem::writePhotonFlux(
   hid_t file_id =
       hdf5_utils::file_open(filename.c_str(), 'w', parallel, comm().get());
 
-  for (int inv_id = 0; inv_id < _n_inventories; inv_id++) {
+  for (int inv_id = 0; inv_id < *_n_solution_inventories; inv_id++) {
 
     std::string dataset_name =
         "photon_flux_" + std::to_string(inventory_times[inv_id]);

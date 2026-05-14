@@ -9,9 +9,11 @@ registerMooseObject("FizzyApp", FispactInventoryManager);
 
 FispactInventoryManager::FispactInventoryManager(
     const InputParameters &parameters)
-    : FispactUserObject(parameters) {
+    : FispactUserObject(parameters),
+      _n_fispact_inventories(
+          getFispactProblem().getSchedule().getNumInventories()) {
 
-  _n_fispact_inventories = getFispactProblem().getSchedule()->getTimes().size();
+  initialiseNuclearInventory();
 }
 
 void FispactInventoryManager::registerNuclideMetricRequest(
@@ -36,32 +38,60 @@ void FispactInventoryManager::registerNuclideMetricRequest(
   }
 }
 
+void FispactInventoryManager::registerElementMetricRequest(
+    const inventory_outputs::InventoryOutputsEnum metric,
+    const std::set<SubdomainID> &blocks) {
+
+  for (const libMesh::Elem *elem :
+       *getSubProblem().mesh().getActiveLocalElementRange()) {
+    if (blocks.count(elem->subdomain_id())) {
+      getElementInventory(elem->id())
+          .registerElementMetricRequest(_n_fispact_inventories, metric);
+    }
+  }
+}
+
 void FispactInventoryManager::extractInventoryData(
-    FispactContextBase &fp_context, size_t elem_id, int inv_index) {
+    FispactContextBase &fp_context, size_t elem_id) {
 
-  std::vector<std::unique_ptr<FispactOutputNuclideDataBase>>
-      fispact_inventory_nuclides =
-          fp_context.getOutput().getInventoryNuclides(inv_index);
+  for (size_t inv_index = 0; inv_index < _n_fispact_inventories; inv_index++) {
 
-  ElementInventory &elem_inv = getElementInventory(elem_id);
+    std::vector<std::unique_ptr<FispactOutputNuclideDataBase>>
+        fispact_inventory_nuclides =
+            fp_context.getOutput().getInventoryNuclides(inv_index);
 
-  for (size_t &nuclide : elem_inv.getNuclides()) {
+    ElementInventory &elem_inv = getElementInventory(elem_id);
 
-    NuclideInventory &nuclide_inv = elem_inv.getNuclide(nuclide);
+    for (auto &[metric, values] : elem_inv.getInventoryMetricMap()) {
+      values[inv_index] =
+          fp_context.getOutput().getInventoryValue(inv_index, metric);
+    }
 
-    int zai = fp_context.getUtils().GetZai(_nuclide_names[nuclide]);
-    // Check nuclide data exists for this inventory step
-    if (fp_context.getOutput().findInventoryExists(inv_index, zai)) {
+    for (size_t &nuclide : elem_inv.getNuclides()) {
 
+      NuclideInventory &nuclide_inv = elem_inv.getNuclide(nuclide);
+
+      int zai = fp_context.getUtils().GetZai(_nuclide_names[nuclide]);
+      // Check nuclide data exists for this inventory step
       int fispact_nuclide_index =
-          fp_context.getOutput().findInventoryIndex(inv_index, zai);
+          fp_context.getOutput().findInventoryExists(inv_index, zai)
+              ?
 
-      for (nuclide_quantities::NuclideQuantitiesEnum quantity :
-           elem_inv.getNuclide(nuclide).getQuantities()) {
+              fp_context.getOutput().findInventoryIndex(inv_index, zai)
+              : -1;
 
-        nuclide_inv.getQuantity(quantity, inv_index) =
-            fispact_inventory_nuclides[fispact_nuclide_index]->getQuantity(
-                quantity);
+      // If the FISPACT inventory does not contain this nuclide, set the
+      // quantity value to 0
+      if (fispact_nuclide_index != -1) {
+
+        for (nuclide_quantities::NuclideQuantitiesEnum quantity :
+             elem_inv.getNuclide(nuclide).getQuantities()) {
+
+          nuclide_inv.setQuantity(
+              quantity, inv_index,
+              fispact_inventory_nuclides[fispact_nuclide_index]->getQuantity(
+                  quantity));
+        }
       }
     }
   }
@@ -70,9 +100,15 @@ void FispactInventoryManager::extractInventoryData(
 double FispactInventoryManager::getNuclideMetric(
     libMesh::dof_id_type elem_id, std::string &nuclide, int inv_index,
     nuclide_quantities::NuclideQuantitiesEnum metric) const {
-  return _element_inventories.at(elem_id)
+  return getElementInventory(elem_id)
       .getNuclide(_nuclide_ids.at(nuclide))
       .getQuantity(metric, inv_index);
+}
+
+double FispactInventoryManager::getElementMetric(
+    libMesh::dof_id_type elem_id, int inv_index,
+    inventory_outputs::InventoryOutputsEnum metric) const {
+  return getElementInventory(elem_id).getElementMetric(metric, inv_index);
 }
 
 void FispactInventoryManager::initialiseNuclearInventory() {
@@ -85,12 +121,17 @@ void FispactInventoryManager::initialiseNuclearInventory() {
 
 FispactInventoryManager::ElementInventory &
 FispactInventoryManager::getElementInventory(size_t elem_id) {
-  for (int i = 0; i < _element_inventories.size(); i++) {
-    if (_element_inventories[i].getElemID() == elem_id) {
-      return _element_inventories[i];
-    }
-  }
-  throw std::invalid_argument(
-      "No element inventory exists for Element with id " +
-      std::to_string(elem_id) + ".");
+
+  _console << elem_id << std::endl;
+  size_t index = _fispact_problem.getLocalElemIndexMap()[elem_id];
+  _console << index << std::endl;
+  return _element_inventories[index];
+}
+
+const FispactInventoryManager::ElementInventory &
+FispactInventoryManager::getElementInventory(size_t elem_id) const {
+
+  _console << elem_id << std::endl;
+  size_t index = _fispact_problem.getLocalElemIndexMap()[elem_id];
+  return _element_inventories[index];
 }

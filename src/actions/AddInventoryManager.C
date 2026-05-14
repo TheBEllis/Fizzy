@@ -1,14 +1,16 @@
 #include "ActionWarehouse.h"
-#include "AddAuxKernelAction.h"
 #include "AddInventoryManager.h"
+#include "AddKernelAction.h"
+#include "AuxKernel.h"
+#include "AuxiliarySystem.h"
 #include "FispactInventoryManager.h"
+#include "FizzyEnums.h"
 #include "InputParameters.h"
 #include "MooseMeshUtils.h"
 #include "MooseTypes.h"
 #include "Registry.h"
 
-registerMooseAction("FizzyApp", AddInventoryManager,
-                    "add_vector_postprocessor");
+registerMooseAction("FizzyApp", AddInventoryManager, "add_inventory_manager");
 
 typedef std::pair<nuclide_quantities::NuclideQuantitiesEnum,
                   std::set<SubdomainID>>
@@ -23,36 +25,70 @@ AddInventoryManager::AddInventoryManager(const InputParameters &params)
     : Action(params) {}
 
 void AddInventoryManager::act() {
-
   std::unordered_map<std::string, std::vector<NuclideMetricsBlocksPair>>
       nuclide_metrics;
 
-  std::vector<const AddAuxKernelAction *> aux_input_blocks =
-      _awh.getActions<AddAuxKernelAction>();
+  std::unordered_map<inventory_outputs::InventoryOutputsEnum,
+                     std::set<SubdomainID>>
+      element_metrics;
 
-  for (auto &aux_kernel_action : aux_input_blocks) {
-    const InputParameters &params = aux_kernel_action->parameters();
-    if (params.get<std::string>("type") == "FispactNuclideKernel") {
+  const std::vector<std::shared_ptr<AuxKernel>> aux_kernels =
+      _problem->getAuxiliarySystem().elemAuxWarehouse().getObjects();
+
+  for (auto &aux_kernel : aux_kernels) {
+    const InputParameters &params = aux_kernel->parameters();
+    if (params.get<std::string>("_type") == "FispactNuclideKernel") {
 
       const nuclide_quantities::NuclideQuantitiesEnum &metric =
-          params.get<nuclide_quantities::NuclideQuantitiesEnum>("metric");
+          params.get<MooseEnum>("metric")
+              .getEnum<nuclide_quantities::NuclideQuantitiesEnum>();
 
       const std::string &nuclide = params.get<std::string>("nuclide");
 
-      std::vector<SubdomainName> block_names =
-          params.get<std::vector<SubdomainName>>("blocks");
+      std::set<SubdomainID> block_ids_set;
 
-      std::vector<SubdomainID> block_ids =
-          MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
+      if (aux_kernel->blocks().empty()) {
+        block_ids_set = _mesh->meshSubdomains();
+      } else {
 
-      std::set<SubdomainID> block_ids_set(block_ids.begin(), block_ids.end());
+        std::vector<SubdomainName> block_names = aux_kernel->blocks();
+
+        std::vector<SubdomainID> block_ids =
+            MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
+
+        block_ids_set =
+            std::set<SubdomainID>(block_ids.begin(), block_ids.end());
+      }
 
       nuclide_metrics[nuclide].push_back(
           NuclideMetricsBlocksPair(metric, block_ids_set));
     }
+
+    if (params.get<std::string>("_type") == "FispactElementKernel") {
+
+      const inventory_outputs::InventoryOutputsEnum &metric =
+          params.get<MooseEnum>("metric")
+              .getEnum<inventory_outputs::InventoryOutputsEnum>();
+
+      std::set<SubdomainID> block_ids_set;
+
+      if (aux_kernel->blocks().empty()) {
+        block_ids_set = _mesh->meshSubdomains();
+      } else {
+
+        std::vector<SubdomainName> block_names = aux_kernel->blocks();
+
+        std::vector<SubdomainID> block_ids =
+            MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
+
+        block_ids_set =
+            std::set<SubdomainID>(block_ids.begin(), block_ids.end());
+      }
+      element_metrics[metric] = block_ids_set;
+    }
   }
 
-  if (!nuclide_metrics.empty()) {
+  if (!(nuclide_metrics.empty() && element_metrics.empty())) {
     InputParameters inventory_params =
         _app.getFactory().getValidParams("FispactInventoryManager");
     _problem->addUserObject("FispactInventoryManager", "inv_manager",
@@ -67,6 +103,11 @@ void AddInventoryManager::act() {
         inv_manager.registerNuclideMetricRequest(
             nuclide, metric_block_pair.first, metric_block_pair.second);
       }
+    }
+
+    for (auto &[metric, blocks] : element_metrics) {
+
+      inv_manager.registerElementMetricRequest(metric, blocks);
     }
   }
 }

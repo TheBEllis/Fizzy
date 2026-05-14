@@ -79,7 +79,14 @@ public:
     return _photon_energy_spectra.get();
   }
 
-  const FispactSchedule *getSchedule() const { return _fp_schedule_uo; }
+  const FispactSchedule &getSchedule() const {
+    if (hasUserObject(_fp_schedule_uo_name)) {
+      return getUserObject<FispactSchedule>(_fp_schedule_uo_name);
+    }
+    mooseError("FispactSchedule UserObject has not been instantiated.");
+  }
+
+  size_t getFispactInventoryIndexFromTime();
 
   const double getOutputInventoryTime() const { return _output_inventory_time; }
 
@@ -295,7 +302,10 @@ protected:
   uint64_t _n_photon_bins;
 
   /// Number of FISPACT inventories
-  uint64_t _n_inventories;
+  const size_t *_n_inventories;
+
+  /// Number of FISPACT solution inventories(ignoring initial conditions)
+  const size_t *_n_solution_inventories;
 
   double _output_inventory_time;
 
@@ -303,16 +313,16 @@ protected:
   UserObjectName _fp_schedule_uo_name;
 
   ///
-  UserObjectName _fp_flux_uo_name;
+  UserObjectName _fp_flux_uo_name = NULL;
 
   /// Fispact nuclear data path
   UserObjectName _fp_nuclear_data_uo_name;
 
-  FispactSchedule *_fp_schedule_uo;
+  FispactSchedule *_fp_schedule_uo = nullptr;
 
   FispactNuclearDataPaths *_fp_nuclear_data_uo;
 
-  FispactFluxInput *_fp_flux_input_uo;
+  FispactFluxInput *_fp_flux_input_uo = nullptr;
 
   std::vector<FispactMaterial *> _fp_fispact_materials;
 

@@ -11,8 +11,7 @@
 
 #include "MooseApp.h"
 
-class FizzyApp : public MooseApp
-{
+class FizzyApp : public MooseApp {
 public:
   static InputParameters validParams();
 
@@ -20,5 +19,7 @@ public:
   virtual ~FizzyApp();
 
   static void registerApps();
-  static void registerAll(Factory & f, ActionFactory & af, Syntax & s);
+  static void registerAll(Factory &f, ActionFactory &af, Syntax &s);
+  static void associateSyntaxInner(Syntax &syntax,
+                                   ActionFactory &action_factory);
 };

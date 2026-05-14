@@ -1,4 +1,5 @@
 #pragma once
+#include "FizzyEnums.h"
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -44,6 +45,9 @@ public:
   // The inhalation (Sv)
   virtual double getInhalation() const = 0;
 
+  virtual double
+  getQuantity(nuclide_quantities::NuclideQuantitiesEnum quantity) const = 0;
+
 private:
 };
 
@@ -85,31 +89,24 @@ public:
   virtual std::vector<std::unique_ptr<FispactOutputNuclideDataBase>>
   getInventoryNuclides(int inventory_index) = 0;
 
-  enum FispactOutputs {
-    FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME,
-    FISPACT_OUTPUT_DATA_INVENTORY_COOL_TIME,
-    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ACTIVITY,
-    FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_ACTIVITY,
-    FISPACT_OUTPUT_DATA_INVENTORY_BETA_ACTIVITY,
-    FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_ACTIVITY,
-    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT,
-    FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_HEAT,
-    FISPACT_OUTPUT_DATA_INVENTORY_BETA_HEAT,
-    FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT,
-    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS,
-    FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ATOMS,
-    FISPACT_OUTPUT_DATA_INVENTORY_INGESTION,
-    FISPACT_OUTPUT_DATA_INVENTORY_INHALATION,
-    FISPACT_OUTPUT_DATA_INVENTORY_FLUX_AMP
-  };
-
   virtual std::pair<std::vector<int>, std::vector<double>>
-  getSortedInventory(int inv_index, FispactOutputs key) const = 0;
+  getSortedInventory(int inv_index,
+                     inventory_outputs::InventoryOutputsEnum key) const = 0;
+
+  virtual double
+  getInventoryValue(int inv_index,
+                    inventory_outputs::InventoryOutputsEnum key) = 0;
+
+  virtual int findInventoryIndex(int inv_index, int zai) = 0;
+
+  virtual bool findInventoryExists(int inv_index, int zai) = 0;
 };
 
 class IFispactUtilsBase {
 public:
   virtual int GetZai(std::string nuclidename) = 0;
+
+  virtual std::string getNuclideName(int zai) = 0;
 
   virtual int GetAtomicNumberFromElementName(std::string elementname) = 0;
 

@@ -18,7 +18,9 @@ InputParameters FispactSchedule::validParams() {
 FispactSchedule::FispactSchedule(const InputParameters &parameters)
     : GeneralUserObject(parameters),
       _flux_amplitude(getParam<std::vector<double>>("flux_amplitude")),
-      _times(getParam<std::vector<double>>("times")) {
+      _times(getParam<std::vector<double>>("times")),
+      _n_solution_inventories(_times.size()),
+      _n_inventories(_n_solution_inventories + 1) {
   // Check vectors passed in are the right size
   if (_times.size() != _flux_amplitude.size()) {
     mooseError("The length of the flux_schdule and times must be equal");
@@ -40,4 +42,12 @@ const std::vector<double> &FispactSchedule::getTimes() const { return _times; }
 
 const std::vector<double> &FispactSchedule::getCumulativeTimes() const {
   return _cumulative_times;
+}
+
+const size_t &FispactSchedule::getNumInventories() const {
+  return _n_inventories;
+}
+
+const size_t &FispactSchedule::getNumSolutionInventories() const {
+  return _n_solution_inventories;
 }

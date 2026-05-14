@@ -1,4 +1,5 @@
 #include "FispactNuclideKernel.h"
+#include "FispactProblem.h"
 #include "InputParameters.h"
 #include "Registry.h"
 
@@ -21,4 +22,14 @@ FispactNuclideKernel::FispactNuclideKernel(const InputParameters &params)
       _metric(getParam<MooseEnum>("metric")
                   .getEnum<nuclide_quantities::NuclideQuantitiesEnum>()) {}
 
-Real FispactNuclideKernel::computeValue() { return 1; }
+Real FispactNuclideKernel::computeValue() {
+  const FispactInventoryManager &inv_manager =
+      getUserObjectByName<FispactInventoryManager>("inv_manager");
+
+  FispactProblem &fis_problem = static_cast<FispactProblem &>(_c_fe_problem);
+
+  size_t inventory_idx = fis_problem.getFispactInventoryIndexFromTime();
+
+  return inv_manager.getNuclideMetric(_current_elem->id(), _nuclide,
+                                      inventory_idx, _metric);
+}

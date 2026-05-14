@@ -6,9 +6,9 @@ FispactPostprocessor::FispactPostprocessor(const InputParameters &params)
 
 size_t FispactPostprocessor::getFispactInventoryIdx() {
 
-  const FispactSchedule *schedule = getFispactProblem().getSchedule();
+  const FispactSchedule &schedule = getFispactProblem().getSchedule();
 
-  const std::vector<double> &schedule_times = schedule->getCumulativeTimes();
+  const std::vector<double> &schedule_times = schedule.getCumulativeTimes();
 
   double inventory_time;
   if (!_is_transient) {

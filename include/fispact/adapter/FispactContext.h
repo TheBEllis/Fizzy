@@ -3,7 +3,9 @@
 
 #include <fstream>
 #include <memory>
+#include <stdexcept>
 /// Fispact includes
+#include "FizzyEnums.h"
 #include "fispactcompute.hpp"
 #include "fispactelementaldata.hpp"
 #include "fispactgroupconvert.hpp"
@@ -12,23 +14,41 @@
 #include "fispactmonitor.hpp"
 #include "fispactnucleardata.hpp"
 #include "fispactoutputdata.hpp"
+#include "fispactoutputdataapi.h"
 #include "fispactutil.hpp"
 
 inline int
-convertFispactEnum(IFispactOutputDataBase::FispactOutputs output_enum) {
-  if (output_enum ==
-      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT) {
-    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT;
-  }
-  if (output_enum ==
-      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME) {
+convertFispactEnum(inventory_outputs::InventoryOutputsEnum output_enum) {
+  switch (output_enum) {
+  case (inventory_outputs::INVENTORY_IRRAD_TIME):
     return FISPACT_OUTPUT_DATA_INVENTORY_IRRAD_TIME;
-  }
-  if (output_enum ==
-      IFispactOutputDataBase::FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT) {
+  case (inventory_outputs::INVENTORY_COOL_TIME):
+    return FISPACT_OUTPUT_DATA_INVENTORY_COOL_TIME;
+  case (inventory_outputs::INVENTORY_TOTAL_ACTIVITY):
+    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ACTIVITY;
+  case (inventory_outputs::INVENTORY_ALPHA_ACTIVITY):
+    return FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_ACTIVITY;
+  case (inventory_outputs::INVENTORY_BETA_ACTIVITY):
+    return FISPACT_OUTPUT_DATA_INVENTORY_BETA_ACTIVITY;
+  case (inventory_outputs::INVENTORY_GAMMA_ACTIVITY):
+    return FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_ACTIVITY;
+  case (inventory_outputs::INVENTORY_TOTAL_HEAT):
+    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_HEAT;
+  case (inventory_outputs::INVENTORY_ALPHA_HEAT):
+    return FISPACT_OUTPUT_DATA_INVENTORY_ALPHA_HEAT;
+  case (inventory_outputs::INVENTORY_BETA_HEAT):
+    return FISPACT_OUTPUT_DATA_INVENTORY_BETA_HEAT;
+  case (inventory_outputs::INVENTORY_GAMMA_HEAT):
     return FISPACT_OUTPUT_DATA_INVENTORY_GAMMA_HEAT;
+  case (inventory_outputs::INVENTORY_TOTAL_MASS):
+    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_MASS;
+  case (inventory_outputs::INVENTORY_TOTAL_ATOMS):
+    return FISPACT_OUTPUT_DATA_INVENTORY_TOTAL_ATOMS;
+  case (inventory_outputs::INVENTORY_FLUX_AMP):
+    return FISPACT_OUTPUT_DATA_INVENTORY_FLUX_AMP;
+  default:
+    return -1;
   }
-  return -1;
 }
 
 class FispactOutputNuclideData : public FispactOutputNuclideDataBase {
@@ -79,6 +99,37 @@ public:
   virtual double getIngestion() const { return _nuclide_data.getIngestion(); }
   // The inhalation (Sv)
   virtual double getInhalation() const { return _nuclide_data.getInhalation(); }
+
+  virtual double
+  getQuantity(nuclide_quantities::NuclideQuantitiesEnum quantity) const {
+    switch (quantity) {
+    case (nuclide_quantities::ATOMS):
+      return getAtoms();
+    case (nuclide_quantities::GRAMS):
+      return getGrams();
+    case (nuclide_quantities::ACTIVITY):
+      return getActivity();
+    case (nuclide_quantities::ALPHA_ACTIVITY):
+      return getAlphaActivity();
+    case (nuclide_quantities::BETA_ACTIVITY):
+      return getBetaActivity();
+    case (nuclide_quantities::GAMMA_ACTIVITY):
+      return getGammaActivity();
+    case (nuclide_quantities::TOTAL_HEAT):
+      return getTotalHeat();
+    case (nuclide_quantities::ALPHA_HEAT):
+      return getAlphaHeat();
+    case (nuclide_quantities::BETA_HEAT):
+      return getBetaHeat();
+    case (nuclide_quantities::GAMMA_HEAT):
+      return getGammaHeat();
+    case (nuclide_quantities::DOSE):
+      return getDoseRate();
+    default:
+      throw std::invalid_argument(
+          "Invalid quantity requested from FISPACT nuclide inventory");
+    }
+  }
 
 private:
   fispact::OutputNuclideData _nuclide_data;
@@ -179,8 +230,24 @@ public:
   fispact::OutputData &getOutput() { return _output; };
 
   virtual std::pair<std::vector<int>, std::vector<double>>
-  getSortedInventory(int inv_index, FispactOutputs key) const {
+  getSortedInventory(int inv_index,
+                     inventory_outputs::InventoryOutputsEnum key) const {
+
     return _output.getSortedInventory(inv_index, convertFispactEnum(key));
+  }
+
+  virtual double
+  getInventoryValue(int inv_index,
+                    inventory_outputs::InventoryOutputsEnum key) {
+    return _output.getInventoryValue(inv_index, convertFispactEnum(key));
+  }
+
+  virtual int findInventoryIndex(int inv_index, int zai) {
+    return _output.findInventoryIndex(inv_index, zai);
+  }
+
+  virtual bool findInventoryExists(int inv_index, int zai) {
+    return _output.findInventoryExists(inv_index, zai);
   }
 
 private:
@@ -211,6 +278,10 @@ public:
 
   virtual int GetZai(std::string nuclidename) {
     return fispact::util::GetZai(_monitor, nuclidename);
+  }
+
+  virtual std::string getNuclideName(int zai) {
+    return fispact::util::GetNuclideName(_monitor, zai);
   }
 
   virtual int GetAtomicNumberFromElementName(std::string elementname) {
