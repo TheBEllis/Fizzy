@@ -1,45 +1,46 @@
+#include "FispactElementPostprocessor.h"
+#include "FispactInventoryManager.h"
+#include "FispactProblem.h"
+#include "FizzyEnums.h"
 #include "NuclideMetric.h"
+#include "UserObject.h"
 #include <numeric>
 
 registerMooseObject("FizzyApp", NuclideMetric);
 
 InputParameters NuclideMetric::validParams() {
 
-  InputParameters params = GeneralPostprocessor::validParams();
+  InputParameters params = FispactElementPostprocessor::validParams();
 
-  params.addRequiredParam<std::vector<dof_id_type>>(
-      "element_ids",
-      "Global ID's off all the elements to sum photon emission over.");
+  params.addRequiredParam<std::vector<std::string>>(
+      "nuclides", "Which nuclide should this kernel track");
+
+  params.addRequiredParam<MooseEnum>("metric", getNuclideMetricsEnum(),
+                                     "Which metric should be tracked");
   return params;
 }
 
 NuclideMetric::NuclideMetric(const InputParameters &params)
-    : FispactPostprocessor(params),
-      _element_ids(getParam<std::vector<dof_id_type>>("element_ids")) {}
+    : FispactElementPostprocessor(params),
+      _nuclides(getParam<std::vector<std::string>>("nuclides")),
+      _metric(getParam<MooseEnum>("metric")
+                  .getEnum<nuclide_quantities::NuclideQuantitiesEnum>()) {}
 
 void NuclideMetric::initialize() { _sum = 0; }
 
+void NuclideMetric::threadJoin(const UserObject &y) {};
+
 void NuclideMetric::execute() {
 
-  PhotonSpectra *spectra = getFispactProblem().getPhotonSpectra();
+  size_t inv_index = getFispactProblem().getFispactInventoryIndexFromTime();
 
-  std::unordered_map<uint64_t, uint64_t> &local_element_index =
-      getFispactProblem().getLocalElemIndexMap();
+  const FispactInventoryManager &inv_manager =
+      getUserObjectByName<FispactInventoryManager>("inv_manager");
 
-  size_t inventory_index = getFispactInventoryIdx();
+  for (std::string &nuclide : _nuclides) {
 
-  for (auto &elem_id : _element_ids) {
-
-    if (getFispactProblem().mesh().elemPtr(elem_id)->processor_id() ==
-        processor_id()) {
-
-      std::vector<double>::iterator begin = spectra->spectrum_begin(
-          inventory_index, local_element_index[elem_id]);
-      std::vector<double>::iterator end =
-          spectra->spectrum_end(inventory_index, local_element_index[elem_id]);
-
-      _sum += std::accumulate(begin, end, 0.0);
-    }
+    _sum += inv_manager.getNuclideMetric(_current_elem->id(), nuclide,
+                                         inv_index, _metric);
   }
 }
 

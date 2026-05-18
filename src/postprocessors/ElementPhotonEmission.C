@@ -1,4 +1,5 @@
 #include "ElementPhotonEmission.h"
+#include "FispactProblem.h"
 #include <numeric>
 
 registerMooseObject("FizzyApp", ElementPhotonEmission);
@@ -26,7 +27,8 @@ void ElementPhotonEmission::execute() {
   std::unordered_map<uint64_t, uint64_t> &local_element_index =
       getFispactProblem().getLocalElemIndexMap();
 
-  size_t inventory_index = getFispactInventoryIdx();
+  size_t inventory_index =
+      getFispactProblem().getFispactInventoryIndexFromTime() - 1;
 
   for (auto &elem_id : _element_ids) {
 

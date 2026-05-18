@@ -1,6 +1,7 @@
 #include "ActionWarehouse.h"
 #include "AddInventoryManager.h"
 #include "AddKernelAction.h"
+#include "Attributes.h"
 #include "AuxKernel.h"
 #include "AuxiliarySystem.h"
 #include "FispactInventoryManager.h"
@@ -8,7 +9,9 @@
 #include "InputParameters.h"
 #include "MooseMeshUtils.h"
 #include "MooseTypes.h"
+#include "NuclideMetric.h"
 #include "Registry.h"
+#include <memory>
 
 registerMooseAction("FizzyApp", AddInventoryManager, "add_inventory_manager");
 
@@ -32,11 +35,35 @@ void AddInventoryManager::act() {
                      std::set<SubdomainID>>
       element_metrics;
 
+  // Get all aux kernels in simulation
   const std::vector<std::shared_ptr<AuxKernel>> aux_kernels =
       _problem->getAuxiliarySystem().elemAuxWarehouse().getObjects();
 
+  // Get all postprocessors in simulation
+  std::vector<Postprocessor *> postprocessors;
+  _problem->theWarehouse()
+      .query()
+      .condition<AttribInterfaces>(Interfaces::Postprocessor)
+      .queryInto(postprocessors);
+
+  /// Add all auxiliary kernel requests for nuclide/inventory metrics
   for (auto &aux_kernel : aux_kernels) {
     const InputParameters &params = aux_kernel->parameters();
+
+    std::set<SubdomainID> block_ids_set;
+
+    if (aux_kernel->blocks().empty()) {
+      block_ids_set = _mesh->meshSubdomains();
+    } else {
+
+      std::vector<SubdomainName> block_names = aux_kernel->blocks();
+
+      std::vector<SubdomainID> block_ids =
+          MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
+
+      block_ids_set = std::set<SubdomainID>(block_ids.begin(), block_ids.end());
+    }
+
     if (params.get<std::string>("_type") == "FispactNuclideKernel") {
 
       const nuclide_quantities::NuclideQuantitiesEnum &metric =
@@ -44,21 +71,6 @@ void AddInventoryManager::act() {
               .getEnum<nuclide_quantities::NuclideQuantitiesEnum>();
 
       const std::string &nuclide = params.get<std::string>("nuclide");
-
-      std::set<SubdomainID> block_ids_set;
-
-      if (aux_kernel->blocks().empty()) {
-        block_ids_set = _mesh->meshSubdomains();
-      } else {
-
-        std::vector<SubdomainName> block_names = aux_kernel->blocks();
-
-        std::vector<SubdomainID> block_ids =
-            MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
-
-        block_ids_set =
-            std::set<SubdomainID>(block_ids.begin(), block_ids.end());
-      }
 
       nuclide_metrics[nuclide].push_back(
           NuclideMetricsBlocksPair(metric, block_ids_set));
@@ -70,13 +82,24 @@ void AddInventoryManager::act() {
           params.get<MooseEnum>("metric")
               .getEnum<inventory_outputs::InventoryOutputsEnum>();
 
+      element_metrics[metric] = block_ids_set;
+    }
+  }
+
+  for (Postprocessor *postprocessor : postprocessors) {
+
+    if (NuclideMetric *fispact_postprocessor =
+            dynamic_cast<NuclideMetric *>(postprocessor)) {
+
+      const InputParameters &params = fispact_postprocessor->parameters();
+
       std::set<SubdomainID> block_ids_set;
 
-      if (aux_kernel->blocks().empty()) {
+      if (fispact_postprocessor->blocks().empty()) {
         block_ids_set = _mesh->meshSubdomains();
       } else {
-
-        std::vector<SubdomainName> block_names = aux_kernel->blocks();
+        std::vector<SubdomainName> block_names =
+            fispact_postprocessor->blocks();
 
         std::vector<SubdomainID> block_ids =
             MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
@@ -84,7 +107,19 @@ void AddInventoryManager::act() {
         block_ids_set =
             std::set<SubdomainID>(block_ids.begin(), block_ids.end());
       }
-      element_metrics[metric] = block_ids_set;
+
+      const nuclide_quantities::NuclideQuantitiesEnum &metric =
+          params.get<MooseEnum>("metric")
+              .getEnum<nuclide_quantities::NuclideQuantitiesEnum>();
+
+      const std::vector<std::string> &nuclides =
+          params.get<std::vector<std::string>>("nuclides");
+
+      for (const std::string &nuclide : nuclides) {
+
+        nuclide_metrics[nuclide].push_back(
+            NuclideMetricsBlocksPair(metric, block_ids_set));
+      }
     }
   }
 

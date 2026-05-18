@@ -1,7 +1,9 @@
 #pragma once
-#include "FispactPostprocessor.h"
+#include "FispactElementPostprocessor.h"
+#include "FizzyEnums.h"
+#include "UserObject.h"
 
-class NuclideMetric : public FispactPostprocessor {
+class NuclideMetric : public FispactElementPostprocessor {
 
 public:
   static InputParameters validParams();
@@ -12,9 +14,13 @@ public:
   virtual void execute();
   virtual void finalize();
 
+  virtual void threadJoin(const UserObject &y);
+
   virtual PostprocessorValue getValue() const;
 
-  std::vector<dof_id_type> _element_ids;
-
   Real _sum;
+
+  std::vector<std::string> _nuclides;
+
+  nuclide_quantities::NuclideQuantitiesEnum _metric;
 };

@@ -1,3 +1,4 @@
+#include "FispactProblem.h"
 #include "SubdomainPhotonEmission.h"
 #include <numeric>
 
@@ -23,7 +24,9 @@ void SubdomainPhotonEmission::execute() {
   std::unordered_map<uint64_t, uint64_t> &local_element_index =
       getFispactProblem().getLocalElemIndexMap();
 
-  size_t inventory_index = getFispactInventoryIdx();
+  size_t inventory_index =
+      getFispactProblem().getFispactInventoryIndexFromTime() - 1;
+
   for (auto &block_id : blockIDs()) {
     for (libMesh::Elem *elem :
          getFispactProblem()

@@ -1,23 +1,25 @@
 #pragma once
-#include "GeneralPostprocessor.h"
+#include "ElementPostprocessor.h"
 #include "InputParameters.h"
+#include "UserObject.h"
 
 // Forward dec
 class FispactProblem;
 
-class FispactPostprocessor : public GeneralPostprocessor {
+class FispactElementPostprocessor : public ElementPostprocessor {
 
 public:
   static InputParameters validParams() {
-    InputParameters params = GeneralPostprocessor::validParams();
+    InputParameters params = ElementPostprocessor::validParams();
     return params;
   };
 
-  FispactPostprocessor(const InputParameters &params);
+  FispactElementPostprocessor(const InputParameters &params);
 
   virtual void initialize() = 0;
   virtual void execute() = 0;
   virtual void finalize() = 0;
+  virtual void threadJoin(const UserObject &y) = 0;
 
   virtual PostprocessorValue getValue() const = 0;
 

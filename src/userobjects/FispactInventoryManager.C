@@ -122,16 +122,13 @@ void FispactInventoryManager::initialiseNuclearInventory() {
 FispactInventoryManager::ElementInventory &
 FispactInventoryManager::getElementInventory(size_t elem_id) {
 
-  _console << elem_id << std::endl;
   size_t index = _fispact_problem.getLocalElemIndexMap()[elem_id];
-  _console << index << std::endl;
   return _element_inventories[index];
 }
 
 const FispactInventoryManager::ElementInventory &
 FispactInventoryManager::getElementInventory(size_t elem_id) const {
 
-  _console << elem_id << std::endl;
   size_t index = _fispact_problem.getLocalElemIndexMap()[elem_id];
   return _element_inventories[index];
 }

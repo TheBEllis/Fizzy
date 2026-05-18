@@ -342,17 +342,17 @@ void FispactProblem::externalSolve() {
       for (int inv_index = 0; inv_index < *_n_solution_inventories;
            inv_index++) {
 
-        // if (global_elem_id == 20) {
-        //   auto sorted_inv = _fp_ctxt->getOutput().getSortedInventory(
-        //       inv_index, inventory_outputs::INVENTORY_TOTAL_ATOMS);
-        //   for (int i = 0; i < 10; i++) {
-        //     _console <<
-        //     _fp_ctxt->getUtils().getNuclideName(sorted_inv.first[i])
-        //              << ": " << sorted_inv.second[i] << std::endl;
-        //     ;
-        //   }
-        // }
-        // _console << std::endl;
+        if (global_elem_id == 20) {
+          auto sorted_inv = _fp_ctxt->getOutput().getSortedInventory(
+              inv_index, inventory_outputs::INVENTORY_TOTAL_HEAT);
+          for (int i = sorted_inv.first.size() - 10;
+               i < sorted_inv.first.size(); i++) {
+            _console << _fp_ctxt->getUtils().getNuclideName(sorted_inv.first[i])
+                     << ": " << sorted_inv.second[i] << std::endl;
+            ;
+          }
+        }
+        _console << std::endl;
 
         /// Vector to store photon energy spectra in photons/cc-s
         std::vector<double> element_photon_energy_spectrum;
@@ -583,7 +583,7 @@ FispactProblem::getElementMaterial(dof_id_type &elem_id) {
 
   // Query the warehouse to see if a FispactMaterial exists on the block this
   // element is assigned to
-  std::vector<GeneralUserObject *> objs;
+  std::vector<UserObject *> objs;
   theWarehouse()
       .query()
       .condition<AttribSystem>("UserObject")
