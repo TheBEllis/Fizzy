@@ -1,8 +1,7 @@
 [Mesh]
   [fmg]
     type = FileMeshGenerator
-    #file = "../../geometry/cube.e"
-    file = "../../../SINBAD/FNGFizzy/geometry/Neutrons/fng_mesh.e"
+    file = "../../geometry/cube.e"
   []
 []
 
@@ -14,13 +13,52 @@
 
   molar_mass_data = '../../molar_masses.h5'
 
+  output_inventory_time = 1e5
+
   fispact_schedule_uo = 'Schedule'
   fispact_nuclear_data_uo = 'endf_nuclear_data'
   fispact_input_flux_uo = 'InputFlux'
+
+  atol = 1e-1
+  rtol = 1e-1
+[]
+
+[AuxVariables]
+  [B10_atoms]
+    family = MONOMIAL
+    order = CONSTANT
+  []
+  [Nb93_atoms]
+    family = MONOMIAL
+    order = CONSTANT
+  []
+  [atoms]
+    family = MONOMIAL
+    order = CONSTANT
+  []
+[]
+
+[AuxKernels]
+  [B10_atoms_kernel]
+    type = FispactNuclideKernel
+    variable = B10_atoms
+    nuclide = "B10"
+    metric = "ATOMS"
+ []
+ [B12_atoms_kernel]
+    type = FispactNuclideKernel
+    variable = Nb93_atoms 
+    nuclide = "Nb93"
+    metric = "ATOMS"
+ []
+ [atoms_kernel]
+    type = FispactElementKernel
+    variable = atoms 
+    metric = "INVENTORY_TOTAL_ATOMS"
+  []
 []
 
 [UserObjects]
-
   [InputFlux]
     type = OpenMCFluxInput
     statepoint_filename = './statepoint_neutrons.10.h5'
@@ -31,8 +69,8 @@
 
   [Schedule]
     type = FispactSchedule
-    times = '300 30 30 30 30 30'
-    flux_amplitude = '1e10 0 0 0 0 0'
+    times = '1e5 1e4 1e4 2e5 2e5 2e5 5e5 5e5 2e5'
+    flux_amplitude = '1e10 0 0 0 0 0 0 0 0'
   []
 
   [steel]
@@ -57,6 +95,21 @@
     ND_DK_ENDF_KEY = "ENDFB80data/decay"
     ND_ABSORP_KEY = "decay/abs_2012"
   []
+
+
+
+  [cendl_nuclear_data]
+    type = FispactNuclearDataPaths
+    base_path = "/home/bill/Projects/FispactNuclearData/"
+    ND_IND_NUC_KEY = "decay_2020_index.txt"
+    ND_XS_ENDF_KEY = "CENDL32data/gendf-1102"
+    #ND_XS_ENDFB_KEY = "CENDL-n.bin"
+    ND_FY_ENDF_KEY = "GEFY61data/gefy61_nfy"
+    ND_SF_ENDF_KEY = "GEFY61data/gefy61_sfy"
+    ND_PROB_TAB_KEY = "CENDL32data/tp-1102-294"
+    ND_DK_ENDF_KEY = "decay_2020"
+    ND_ABSORP_KEY = "decay/abs_2012"
+  []
 []
 
 [Postprocessors]
@@ -64,10 +117,46 @@
     type = ElementPhotonEmission
     element_ids = '0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47'
   []
+
+  [nuclide_contribution]
+    type = NuclideMetric
+    nuclides = "Cr51"
+    metric = "DOSE"
+  []
+
+[]
+
+[VectorPostprocessors]
+  [PhotonEmissionAllBlocks]
+  []
+[]
+
+[Times]
+  [FizzyTimes]
+    type = FispactScheduleTimes
+    FispactScheduleName = Schedule
+#    FispactScheduleTimeIndices = '0 1'
+
+  []
 []
 
 [Executioner]
-  type = Steady
+  #type = Steady 
+
+  type = Transient
+
+  [TimeStepper]
+    type = TimeSequenceFromTimes
+    times = FizzyTimes 
+    use_last_t_for_end_time = True
+  []
+[]
+
+[Outputs]
+  [CSV]
+    type = CSV
+  []
+  exodus = true
 []
 
 
