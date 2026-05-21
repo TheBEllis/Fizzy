@@ -93,7 +93,6 @@
     nuclides = "Cr51"
     metric = "DOSE"
   []
-
 []
 
 [Executioner]
