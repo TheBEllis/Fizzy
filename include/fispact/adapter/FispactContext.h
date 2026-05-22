@@ -437,7 +437,6 @@ public:
       }
 
       if (data == "ND_XS_ENDF_KEY") {
-        std::cout << "HERE" << std::endl;
         nd_reader.setPath(FISPACT_ND_XS_ENDF_KEY, path);
         continue;
       }
