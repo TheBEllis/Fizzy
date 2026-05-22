@@ -9,6 +9,10 @@ registerMooseAction("FizzyApp", AddPhotonSpectraVectorPPAllBlocks,
 
 InputParameters AddPhotonSpectraVectorPPAllBlocks::validParams() {
   InputParameters params = Action::validParams();
+  params.addClassDescription(
+      "A MOOSE action that adds a SubdomainPhotonEmissionSpectraPostprocessor "
+      "for all subdomains on the mesh. Useful when there are many subdomains, "
+      "for example you have a block representing each cell in a CSG geometry.");
   return params;
 }
 

@@ -8,6 +8,9 @@ registerMooseObject("FizzyApp", OpenMCFluxInput);
 InputParameters OpenMCFluxInput::validParams() {
   InputParameters params = FispactFluxInput::validParams();
 
+  params.addClassDescription(
+      "A UserObject used to read tallied flux from an OpenMC statepoint file.");
+
   params.addRequiredParam<size_t>(
       "flux_tally_id", "OpenMC tally ID of the tallies neutron flux");
 

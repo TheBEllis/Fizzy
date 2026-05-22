@@ -9,6 +9,9 @@ registerMooseObject("FizzyApp", FispactElementKernel);
 InputParameters FispactElementKernel::validParams() {
   InputParameters params = FispactAuxKernel::validParams();
 
+  params.addClassDescription("AuxKernel to calculate user defined inventory "
+                             "metrics, for all nuclides in the inventory.");
+
   params.addRequiredParam<MooseEnum>("metric", getInventoryMetricsEnum(),
                                      "Which metric should be tracked.");
 

@@ -7,6 +7,9 @@ InputParameters SubdomainPhotonEmissionSpectraPostprocessor::validParams() {
   InputParameters params = FispactVectorPostprocessor::validParams();
   params += BlockRestrictable::validParams();
 
+  params.addClassDescription("Postprocessor used to get the photon emission "
+                             "spectra for a given subdomain(s).");
+
   return params;
 }
 

@@ -11,6 +11,9 @@ InputParameters FispactMaterial::validParams() {
   InputParameters params = FispactUserObject::validParams();
   params += BlockRestrictable::validParams();
 
+  params.addClassDescription(
+      "A class designed to hold material definitions for FISPACT-II solves.");
+
   params.addRequiredParam<std::vector<std::string>>(
       "nuclides", "a list of nuclides present in the material");
 

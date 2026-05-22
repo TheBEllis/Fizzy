@@ -16,6 +16,20 @@ FispactInventoryManager::FispactInventoryManager(
   initialiseNuclearInventory();
 }
 
+InputParameters FispactInventoryManager::validParams() {
+
+  InputParameters params = FispactUserObject::validParams();
+
+  params.addClassDescription(
+      "A UserObject designed to recieve requests from postprocessors and "
+      "auxkernels regarding which nuclear inventory quantities they require to "
+      "compute their values. The inventory manager stores these requests and "
+      "retrieves the necessary data from the FISPACT output object generated "
+      "after each FISPACT solve.");
+
+  return params;
+}
+
 void FispactInventoryManager::registerNuclideMetricRequest(
     const std::string &nuclide,
     const nuclide_quantities::NuclideQuantitiesEnum metric,

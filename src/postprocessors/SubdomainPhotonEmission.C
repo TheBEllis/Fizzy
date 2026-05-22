@@ -7,6 +7,11 @@ registerMooseObject("FizzyApp", SubdomainPhotonEmission);
 InputParameters SubdomainPhotonEmission::validParams() {
 
   InputParameters params = FispactPostprocessor::validParams();
+
+  params.addClassDescription("Postprocessor used to get the total photon "
+                             "emission rate in photons/s from a "
+                             "given subdomain(s).");
+
   params += BlockRestrictable::validParams();
 
   return params;

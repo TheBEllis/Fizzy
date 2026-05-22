@@ -33,6 +33,10 @@ registerMooseObject("FizzyApp", FispactProblem);
 InputParameters FispactProblem::validParams() {
   InputParameters params = ExternalProblem::validParams();
 
+  params.addClassDescription(
+      "Run a FISPACT-II solve using MOOSE input syntax, and obtain inventory "
+      "quantities as aux variables.");
+
   /// Suppress parameters we are not using
   params.suppressParameter<bool>("allow_invalid_solution");
   params.suppressParameter<bool>("boundary_restricted_elem_integrity_check");
@@ -318,9 +322,6 @@ void FispactProblem::externalSolve() {
       _console << counter++ << "/" << _mesh.getMesh().n_active_local_elem()
                << std::endl;
 
-      // if (isFlux(input_flux) &&
-      //     mesh_subdomains.count(element->subdomain_id())) {
-
       // If the energy groups of our nuclear data and input flux do not match,
       // convert input flux to energy grouping of loaded nuclear data
       if (_convert_energy_groups) {
@@ -341,18 +342,6 @@ void FispactProblem::externalSolve() {
       /// element
       for (int inv_index = 0; inv_index < *_n_solution_inventories;
            inv_index++) {
-
-        if (global_elem_id == 20) {
-          auto sorted_inv = _fp_ctxt->getOutput().getSortedInventory(
-              inv_index, inventory_outputs::INVENTORY_TOTAL_HEAT);
-          for (int i = sorted_inv.first.size() - 10;
-               i < sorted_inv.first.size(); i++) {
-            _console << _fp_ctxt->getUtils().getNuclideName(sorted_inv.first[i])
-                     << ": " << sorted_inv.second[i] << std::endl;
-            ;
-          }
-        }
-        _console << std::endl;
 
         /// Vector to store photon energy spectra in photons/cc-s
         std::vector<double> element_photon_energy_spectrum;
@@ -378,7 +367,6 @@ void FispactProblem::externalSolve() {
             getUserObject<FispactInventoryManager>("inv_manager");
         inv_manager.extractInventoryData(*_fp_ctxt, global_elem_id);
       }
-      // }
     }
     calculateLocalDomainStrength();
 

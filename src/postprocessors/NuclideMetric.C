@@ -12,6 +12,11 @@ InputParameters NuclideMetric::validParams() {
 
   InputParameters params = FispactElementPostprocessor::validParams();
 
+  params.addClassDescription(
+      "Postprocessor to calculate a user defined inventory "
+      "metric, for a given nuclide(s) in the inventory, over the entire "
+      "domain.");
+
   params.addRequiredParam<std::vector<std::string>>(
       "nuclides", "Which nuclide should this kernel track");
 

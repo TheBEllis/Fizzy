@@ -6,6 +6,9 @@ registerMooseObject("FizzyApp", FispactSchedule);
 InputParameters FispactSchedule::validParams() {
   InputParameters params = GeneralUserObject::validParams();
 
+  params.addClassDescription(
+      "A UserObject used to set the FISPACT-II irradiation schedule.");
+
   params.addRequiredParam<std::vector<double>>("times",
                                                "a list of times with each ");
 

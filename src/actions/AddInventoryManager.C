@@ -21,6 +21,10 @@ typedef std::pair<nuclide_quantities::NuclideQuantitiesEnum,
 
 InputParameters AddInventoryManager::validParams() {
   InputParameters params = Action::validParams();
+  params.addClassDescription(
+      "A MOOSE action automating the inclusion of a FispactInventoryManager "
+      "when aux kernels and postprocessors requiring inventory quantities are "
+      "included in the input file.");
   return params;
 }
 

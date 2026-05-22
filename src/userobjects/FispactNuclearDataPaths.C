@@ -12,6 +12,9 @@ registerMooseObject("FizzyApp", FispactNuclearDataPaths);
 InputParameters FispactNuclearDataPaths::validParams() {
   InputParameters params = GeneralUserObject::validParams();
 
+  params.addClassDescription("A UserObject to store paths to nuclear data, and "
+                             "to check those paths exist.");
+
   params.addParam<std::string>("base_path", "", "");
   params.addParam<std::string>("ND_IND_NUC_KEY", "");
   params.addParam<std::string>("ND_HAZARDS_KEY", "");

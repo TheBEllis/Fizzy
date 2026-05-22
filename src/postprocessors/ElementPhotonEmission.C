@@ -8,6 +8,10 @@ InputParameters ElementPhotonEmission::validParams() {
 
   InputParameters params = GeneralPostprocessor::validParams();
 
+  params.addClassDescription("Postprocessor used to get the total photon "
+                             "emission rate in photons/s from a "
+                             "given set of elements.");
+
   params.addRequiredParam<std::vector<dof_id_type>>(
       "element_ids",
       "Global ID's off all the elements to sum photon emission over.");

@@ -8,6 +8,9 @@ registerMooseObject("FizzyApp", FispactNuclideKernel);
 InputParameters FispactNuclideKernel::validParams() {
   InputParameters params = FispactAuxKernel::validParams();
 
+  params.addClassDescription(
+      "AuxKernel to calculate user defined nuclide inventory metrics.");
+
   params.addRequiredParam<std::string>(
       "nuclide", "Which nuclide should this kernel track.");
 
