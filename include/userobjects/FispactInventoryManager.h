@@ -14,12 +14,7 @@ public:
   /// Forward declaration
   class ElementInventory;
 
-  static InputParameters validParams() {
-
-    InputParameters params = FispactUserObject::validParams();
-
-    return params;
-  }
+  static InputParameters validParams();
 
   FispactInventoryManager(const InputParameters &parameters);
 
