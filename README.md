@@ -1,6 +1,8 @@
-Fizzy
-=====
+#Fizzy
+=======
 
-Fork "Fizzy" to create a new MOOSE-based application. 
+Fizzy is a MOOSE application wrapping the nuclear inventory, source term and multi-physics code, FISPACT-II.
 
-For more information see: [https://mooseframework.inl.gov/getting_started/new_users.html#create-an-app](https://mooseframework.inl.gov/getting_started/new_users.html#create-an-app)
+For installation instructions and tutorials on how to use Fizzy, please visit the github pages page:
+
+
