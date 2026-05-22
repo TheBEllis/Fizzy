@@ -56,7 +56,7 @@ include $(MOOSE_DIR)/modules/modules.mk
 
 # dep apps
 APPLICATION_DIR    := $(CURDIR)
-APPLICATION_NAME   := fizzy
+APPLICATION_NAME   := Fizzy
 BUILD_EXEC         := yes
 GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
@@ -86,6 +86,7 @@ export LDFLAGS := $(libmesh_LDFLAGS)
 export LIBS := $(libmesh_LIBS)
 
 FISPACT_DIR ?= ${MOOSE_DIR}/../FISPACT/ubuntu/20.10
+FISPACT_DIR ?= ${MOOSE_DIR}
 FISPACT_INCLUDES ?= -I ${FISPACT_DIR}/include/c -I ${FISPACT_DIR}/include/cpp
 FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/
 # FISPACT_LIB ?= 
