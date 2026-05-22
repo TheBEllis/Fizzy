@@ -53,4 +53,5 @@ When providing nuclide names to AuxKernels or PostProcessors, make sure they are
 Now that some variables exist on the mesh, we may want to visualise the results.To do this we will need to add an exodus output block, or in this case, use the syntactical shortcut for one. 
 
 !content pagination use_title=True
+                    previous=tutorials/tutorial_1/index.md
                     next=tutorials/tutorial_3/index.md

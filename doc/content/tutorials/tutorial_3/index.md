@@ -34,4 +34,5 @@ Now that the simulation is transient, we can visualise the number of Nb93 atoms 
        loop=true
 
 !content pagination use_title=True
+                    previous=tutorials/tutorial_2/index.md
                     next=tutorials/tutorial_4/index.md

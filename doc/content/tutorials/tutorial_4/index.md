@@ -12,11 +12,11 @@ The next section will explain how to install the latter. For instructions on how
 
 ## Background
 
-!media media/FizzyFlow.png
+!media media/FizzyFlowNoneutrons.png
        id=fizzyflow
        style=width:50%;margin-left:auto;margin-right:auto;
        prefix=Figure
-       caption=Evolution of Nb93 atom count over time.
+       caption=Flow of data in a Fizzy & Cardinal multiapp.
 
 Figure 1 shows the flow of data used when performing distributed sampling with Fizzy. To perform distributed sampling, a custom OpenMC source is used, defined in FizzyCompiledSource. FizzyCompiledSource derived from OpenMC's [CompiledSource](https://docs.openmc.org/en/stable/pythonapi/generated/openmc.CompiledSource.html) functionality, which allows a source term to be defined by a compiled library. We utilise the CompiledSource functionality in order to have granular control over the weighting of sampled particles. This is necessary to perform distributed sampling, as the source terms for different MPI ranks may be of different strengths.
 
@@ -90,4 +90,5 @@ The mesh used in Fizzy and Cardinal must be the same for distributed sampling to
 !alert warning 
 To make use of distributed sampling, OpenMC must be aware of the mesh used in the Fizzy calculation. For OpenMC to be aware of the mesh, at least one mesh tally must exist on the mesh.
 
-
+!content pagination use_title=True
+                    previous=tutorials/tutorial_3/index.md
