@@ -1,7 +1,7 @@
 [Mesh]
   [fmg]
     type = FileMeshGenerator
-    file = "../geometry/cube.e"
+    file = "../../geometry/cube.e"
   []
 []
 
@@ -45,7 +45,7 @@
 [UserObjects]
   [InputFlux]
     type = OpenMCFluxInput
-    statepoint_filename = './statepoint_neutrons.10.h5'
+    statepoint_filename = '../statepoint_neutrons.10.h5'
     energy_filter_id = 2
     flux_tally_id = 2
     wall_loading = 10
@@ -94,9 +94,25 @@
   []
 []
 
-[Executioner]
-  type = Steady 
+
+[Times]
+  [FizzyTimes]
+    type = FispactScheduleTimes
+    FispactScheduleName = Schedule
+  []
 []
+
+
+[Executioner]
+  type = Transient 
+
+  [TimeStepper]
+    type = TimeSequenceFromTimes
+    times = FizzyTimes 
+    use_last_t_for_end_time = True
+  []
+[]
+
 
 [Outputs]
   exodus = true

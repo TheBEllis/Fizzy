@@ -9,6 +9,7 @@
   type = FispactProblem 
 
   molar_mass_data = '../../molar_masses.h5'
+  comm_photon_flux = True
 
   output_inventory_time = 1e5
 
@@ -23,6 +24,10 @@
     order = CONSTANT
   []
   [atoms]
+    family = MONOMIAL
+    order = CONSTANT
+  []
+  [Photon_flux]
     family = MONOMIAL
     order = CONSTANT
   []
@@ -45,7 +50,7 @@
 [UserObjects]
   [InputFlux]
     type = OpenMCFluxInput
-    statepoint_filename = './statepoint_neutrons.10.h5'
+    statepoint_filename = '../statepoint_neutrons.10.h5'
     energy_filter_id = 2
     flux_tally_id = 2
     wall_loading = 10
@@ -94,8 +99,40 @@
   []
 []
 
+[Transfers]
+  [Photon_flux_from_cardinal]
+    type = MultiAppCopyTransfer
+    source_variable =  'photon_flux_photon'
+    variable = Photon_flux
+    from_multi_app='photons'
+  [../]
+[]
+
+[MultiApps]
+  [photons]
+    type = TransientMultiApp
+    execute_on = timestep_end
+    app_type = 'CardinalApp'
+    input_files = '/Projects/Fizzy/inputs/r2s_time/photons_input.i'
+    library_path = '/Projects/cardinal/lib/'
+    library_name = 'libcardinal-opt.la'
+  []
+[]
+
+[Times]
+  [FizzyTimes]
+    type = FispactScheduleTimes
+    FispactScheduleName = Schedule
+  []
+[]
+
 [Executioner]
-  type = Steady 
+  type = Transient 
+  [TimeStepper]
+    type = TimeSequenceFromTimes
+    times = FizzyTimes 
+    use_last_t_for_end_time = True
+  []
 []
 
 [Outputs]

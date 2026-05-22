@@ -1,7 +1,7 @@
 [Mesh]
   [fmg]
     type = FileMeshGenerator
-    file = "../../geometry/cube.e"
+    file = "../geometry/cube.e"
   []
 []
 

@@ -1,5 +1,5 @@
 Applications:
-    fizzy:
+    Fizzy:
         app_types:
             - FizzyApp
         content_directory: ${ROOT_DIR}/doc/content
