@@ -45,7 +45,7 @@
 [UserObjects]
   [InputFlux]
     type = OpenMCFluxInput
-    statepoint_filename = './statepoint_neutrons.10.h5'
+    statepoint_filename = '../statepoint_neutrons.10.h5'
     energy_filter_id = 2
     flux_tally_id = 2
     wall_loading = 10
