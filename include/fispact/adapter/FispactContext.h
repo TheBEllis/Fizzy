@@ -239,7 +239,11 @@ public:
   virtual double
   getInventoryValue(int inv_index,
                     inventory_outputs::InventoryOutputsEnum key) {
-    return _output.getInventoryValue(inv_index, convertFispactEnum(key));
+
+    if (key != inventory_outputs::INVENTORY_DOSE_RATE) {
+      return _output.getInventoryValue(inv_index, convertFispactEnum(key));
+    }
+    return _output.getInventoryDoseRate(inv_index).getDose();
   }
 
   virtual int findInventoryIndex(int inv_index, int zai) {

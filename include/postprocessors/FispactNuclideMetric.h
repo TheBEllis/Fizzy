@@ -3,12 +3,12 @@
 #include "FizzyEnums.h"
 #include "UserObject.h"
 
-class NuclideMetric : public FispactElementPostprocessor {
+class FispactNuclideMetric : public FispactElementPostprocessor {
 
 public:
   static InputParameters validParams();
 
-  NuclideMetric(const InputParameters &params);
+  FispactNuclideMetrics(const InputParameters &params);
 
   virtual void initialize();
   virtual void execute();

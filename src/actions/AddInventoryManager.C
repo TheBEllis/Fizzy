@@ -5,11 +5,12 @@
 #include "AuxKernel.h"
 #include "AuxiliarySystem.h"
 #include "FispactInventoryManager.h"
+#include "FispactInventoryMetric.h"
+#include "FispactNuclideMetric.h"
 #include "FizzyEnums.h"
 #include "InputParameters.h"
 #include "MooseMeshUtils.h"
 #include "MooseTypes.h"
-#include "NuclideMetric.h"
 #include "Registry.h"
 #include <memory>
 
@@ -92,8 +93,8 @@ void AddInventoryManager::act() {
 
   for (Postprocessor *postprocessor : postprocessors) {
 
-    if (NuclideMetric *fispact_postprocessor =
-            dynamic_cast<NuclideMetric *>(postprocessor)) {
+    if (FispactNuclideMetric *fispact_postprocessor =
+            dynamic_cast<FispactNuclideMetric *>(postprocessor)) {
 
       const InputParameters &params = fispact_postprocessor->parameters();
 
@@ -124,6 +125,33 @@ void AddInventoryManager::act() {
         nuclide_metrics[nuclide].push_back(
             NuclideMetricsBlocksPair(metric, block_ids_set));
       }
+    }
+
+    if (FispactInventoryMetric *fispact_postprocessor =
+            dynamic_cast<FispactInventoryMetric *>(postprocessor)) {
+
+      const InputParameters &params = fispact_postprocessor->parameters();
+
+      std::set<SubdomainID> block_ids_set;
+
+      if (fispact_postprocessor->blocks().empty()) {
+        block_ids_set = _mesh->meshSubdomains();
+      } else {
+        std::vector<SubdomainName> block_names =
+            fispact_postprocessor->blocks();
+
+        std::vector<SubdomainID> block_ids =
+            MooseMeshUtils::getSubdomainIDs(*_mesh, block_names);
+
+        block_ids_set =
+            std::set<SubdomainID>(block_ids.begin(), block_ids.end());
+      }
+
+      const inventory_outputs::InventoryOutputsEnum &metric =
+          params.get<MooseEnum>("metric")
+              .getEnum<inventory_outputs::InventoryOutputsEnum>();
+
+      element_metrics[metric] = block_ids_set;
     }
   }
 
