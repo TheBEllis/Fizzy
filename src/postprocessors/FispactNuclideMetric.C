@@ -1,6 +1,6 @@
 #include "FispactElementPostprocessor.h"
 #include "FispactInventoryManager.h"
-#include "FispactNuclideMetrics.h"
+#include "FispactNuclideMetric.h"
 #include "FispactProblem.h"
 #include "FizzyEnums.h"
 #include "UserObject.h"
@@ -8,7 +8,7 @@
 
 registerMooseObject("FizzyApp", FispactNuclideMetric);
 
-InputParameters FispactNuclideMetrics::validParams() {
+InputParameters FispactNuclideMetric::validParams() {
 
   InputParameters params = FispactElementPostprocessor::validParams();
 
@@ -25,17 +25,17 @@ InputParameters FispactNuclideMetrics::validParams() {
   return params;
 }
 
-FispactNuclideMetrics::FispactNuclideMetrics(const InputParameters &params)
+FispactNuclideMetric::FispactNuclideMetric(const InputParameters &params)
     : FispactElementPostprocessor(params),
       _nuclides(getParam<std::vector<std::string>>("nuclides")),
       _metric(getParam<MooseEnum>("metric")
                   .getEnum<nuclide_quantities::NuclideQuantitiesEnum>()) {}
 
-void FispactNuclideMetrics::initialize() { _sum = 0; }
+void FispactNuclideMetric::initialize() { _sum = 0; }
 
-void FispactNuclideMetrics::threadJoin(const UserObject &y) {};
+void FispactNuclideMetric::threadJoin(const UserObject &y) {};
 
-void FispactNuclideMetrics::execute() {
+void FispactNuclideMetric::execute() {
 
   size_t inv_index = getFispactProblem().getFispactInventoryIndexFromTime();
 
@@ -49,6 +49,6 @@ void FispactNuclideMetrics::execute() {
   }
 }
 
-void FispactNuclideMetrics::finalize() { comm().sum(_sum); }
+void FispactNuclideMetric::finalize() { comm().sum(_sum); }
 
-PostprocessorValue FispactNuclideMetrics::getValue() const { return _sum; }
+PostprocessorValue FispactNuclideMetric::getValue() const { return _sum; }

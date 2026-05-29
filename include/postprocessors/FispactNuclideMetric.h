@@ -8,7 +8,7 @@ class FispactNuclideMetric : public FispactElementPostprocessor {
 public:
   static InputParameters validParams();
 
-  FispactNuclideMetrics(const InputParameters &params);
+  FispactNuclideMetric(const InputParameters &params);
 
   virtual void initialize();
   virtual void execute();
