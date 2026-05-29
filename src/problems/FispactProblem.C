@@ -335,37 +335,40 @@ void FispactProblem::externalSolve() {
       setFispactInputData(input_material, input_flux, element->volume(),
                           _fp_ctxt->getInput());
 
-      /// Run FISPACT
-      _fp_ctxt->process();
+      if (mesh_subdomains.count(element->subdomain_id())) {
 
-      /// Loop over number of inventories to get all data for current
-      /// element
-      for (int inv_index = 0; inv_index < *_n_solution_inventories;
-           inv_index++) {
+        /// Run FISPACT
+        _fp_ctxt->process();
 
-        /// Vector to store photon energy spectra in photons/cc-s
-        std::vector<double> element_photon_energy_spectrum;
+        /// Loop over number of inventories to get all data for current
+        /// element
+        for (int inv_index = 0; inv_index < *_n_solution_inventories;
+             inv_index++) {
 
-        /// Calculated Fispact inventories start at index 1, 0 is reserved
-        /// for initial concentrations
-        convertGammaEvToCount(
-            _fp_ctxt->getOutput().getGammaSpectrumBins(inv_index + 1),
-            element_photon_energy_spectrum);
+          /// Vector to store photon energy spectra in photons/cc-s
+          std::vector<double> element_photon_energy_spectrum;
 
-        std::copy(element_photon_energy_spectrum.begin(),
-                  element_photon_energy_spectrum.end(),
-                  _photon_energy_spectra->spectrum_begin(
-                      inv_index, _local_elem_index[global_elem_id]));
+          /// Calculated Fispact inventories start at index 1, 0 is reserved
+          /// for initial concentrations
+          convertGammaEvToCount(
+              _fp_ctxt->getOutput().getGammaSpectrumBins(inv_index + 1),
+              element_photon_energy_spectrum);
 
-        insertElementStrength(inv_index, element,
-                              element_photon_energy_spectrum);
-      }
+          std::copy(element_photon_energy_spectrum.begin(),
+                    element_photon_energy_spectrum.end(),
+                    _photon_energy_spectra->spectrum_begin(
+                        inv_index, _local_elem_index[global_elem_id]));
 
-      // if inventory manager exists, store requested nuclide metrics
-      if (hasUserObject("inv_manager")) {
-        FispactInventoryManager &inv_manager =
-            getUserObject<FispactInventoryManager>("inv_manager");
-        inv_manager.extractInventoryData(*_fp_ctxt, global_elem_id);
+          insertElementStrength(inv_index, element,
+                                element_photon_energy_spectrum);
+        }
+
+        // if inventory manager exists, store requested nuclide metrics
+        if (hasUserObject("inv_manager")) {
+          FispactInventoryManager &inv_manager =
+              getUserObject<FispactInventoryManager>("inv_manager");
+          inv_manager.extractInventoryData(*_fp_ctxt, global_elem_id);
+        }
       }
     }
     calculateLocalDomainStrength();
@@ -480,7 +483,6 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
                                          const std::vector<double> &flux,
                                          const double &volume,
                                          IFispactInputDataBase &input) const {
-  /// Set neutron flux
   input.setFlux(_flux_energy_groups, flux);
   input.setFluxWallLoading(1.0);
   input.setFluxName("neutrons");
@@ -496,7 +498,6 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
 
   double total_mass_grams = density * volume;
 
-  //
   if (material.getMaterialType() == "MASS") {
 
     std::vector<int> atomic_numbers;
