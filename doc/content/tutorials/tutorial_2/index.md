@@ -43,7 +43,7 @@ A [NuclideMetric](NuclideMetric.md) is included to track domain wide metrics fro
 !alert warning
 When providing nuclide names to AuxKernels or PostProcessors, make sure they are formatted correctly, using the correct case.
 
-## Output id=output
+## Output id=outputs
 
 !listing /tutorials/tutorial_2/input.i
          block=Outputs

@@ -65,7 +65,7 @@ This block defines the irradiation schedule of your simulation.
 !alert warning 
 Currently only OpenMC statepoint files are supported as inputs.
 
-This block defines the input flux spectra for your FISPACT-II simulation.
+This block defines the input flux spectra for your FISPACT-II simulation. Here we are using mesh tallied flux spectra from an OpenMC simulation. The provided results data file must be compatible with the input mesh, i.e. it must have the correct dimensions.
 
 ## FISPACT material definitions id=materials
 
@@ -84,6 +84,8 @@ This block defines the materials in the simulation. Each block within the mesh m
          caption=The user defined +Nuclear Data+ 
 
 Here the user sets the necessary paths to their chosen nuclear data set. The [FispactNuclearData](source/userobjects/FispactNuclearDataPaths.md) UserObject will check whether the paths handed to it are valid, but currently it cannot check the validity of the nuclear data itself.
+
+FISPACT-II uses multi-group cross sections. The input flux spectra are required to be binned into the same energy groups as the passed in nuclear data. If the user passes in flux spectra binned into different energy groups, a conversion is automatically performed. The FispactProblem block has a parameter **conversion_type**, which can be set to either ENERGY or LETHARGY depending on how the user would like the energy groups to be converted. 
 
 ## Executioner id=exec
 
