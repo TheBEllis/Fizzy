@@ -93,7 +93,7 @@
   []
 
   [nuclide_contribution]
-    type = NuclideMetric
+    type = FispactNuclideMetric
     nuclides = "Cr51"
     metric = "DOSE"
   []
