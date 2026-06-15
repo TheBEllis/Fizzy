@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <tallies>
   <mesh id="1" type="unstructured" library="libmesh">
-    <filename>/home/bill/Projects/Fizzy/geometry/cube.e</filename>
+    <filename>/Projects/Fizzy/geometry/cube.e</filename>
   </mesh>
   <filter id="1" type="mesh">
     <bins>1</bins>

@@ -4,7 +4,7 @@
   <particles>50000</particles>
   <batches>10</batches>
   <inactive>0</inactive>
-  <source type="compiled" strength="1.0" library="/home/bill/Projects/FizzyCompiledSource/build/libCompiledSource.so" parameters="1"/>
+  <source type="compiled" strength="1.0" library="/Projects/FizzyCompiledSource/build/libCompiledSource.so" parameters="1"/>
   <output>
     <summary>false</summary>
     <tallies>false</tallies>

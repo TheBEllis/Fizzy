@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <geometry>
   <cell id="99999" fill="42" region="-99999" universe="1"/>
-  <dagmc_universe id="42" name="daguni" filename="/home/bill/Projects/Fizzy/geometry/cube_dag.h5m"/>
+  <dagmc_universe id="42" name="daguni" filename="/Projects/Fizzy/geometry/cube_dag.h5m"/>
   <surface id="99999" type="sphere" boundary="vacuum" coeffs="0.0 0.0 0.0 250"/>
 </geometry>
