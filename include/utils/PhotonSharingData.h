@@ -124,12 +124,15 @@ public:
     }
   }
 
+  void setSamplingMethod(bool uniform = false) { _uniform = uniform; }
+
   size_t _num_photon_bins;
   size_t _num_local_elems;
   double _local_domain_strength;
   double _total_domain_strength;
 
   bool _is_setup;
+  bool _uniform;
 
   /// Allocators
   ShmemVecAllocator _vec_alloc;

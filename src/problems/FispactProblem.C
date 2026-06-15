@@ -121,6 +121,12 @@ InputParameters FispactProblem::validParams() {
 
   params.addParam<double>("rtol", 2e-3, "Relative FISPACT solver tolerance.");
   params.addParam<double>("atol", 1e4, "Absolute FISPACT solver tolerance.");
+
+  params.addParam<bool>(
+      "uniform_sampling", false,
+      "When using distributed sampling, this forced all elements to be sampled "
+      "uniformly, with their weighting changed to account for their emission "
+      "strengths.");
   return params;
 }
 
@@ -137,6 +143,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _local_domain_strength(0), _total_domain_strength(0),
       _write_photon_flux(getParam<bool>("write_photon_flux")),
       _comm_photon_flux(getParam<bool>("comm_photon_flux")), _solved(false),
+      _uniform(getParam<bool>("uniform_sampling")),
       _interprocess_segment_name(generateInterprocessName()),
       _molar_mass_data_filename(getParam<FileName>("molar_mass_data")),
       _atol(getParam<double>("atol")), _rtol(getParam<double>("rtol")),
@@ -455,6 +462,8 @@ void FispactProblem::syncSolutions(ExternalProblem::Direction direction) {
           _local_domain_strength[photon_spectra_idx]);
       _photon_sharing_instance->setTotalDomainStrength(
           _total_domain_strength[photon_spectra_idx]);
+
+      _photon_sharing_instance->setSamplingMethod(_uniform);
 
 #else
       mooseError("_comm_photon_flux is set to true but libmesh was not
