@@ -75,7 +75,7 @@
 
   [endf_nuclear_data]
     type = FispactNuclearDataPaths
-    base_path = "/home/bill/Projects/FispactNuclearData/"
+    base_path = "/Projects/FispactNuclearData/"
     ND_IND_NUC_KEY = "ENDFB80data/endfb80_index"
     ND_XS_ENDF_KEY = "ENDFB80data/endfb80-n/gxs-709"
     ND_FY_ENDF_KEY = "ENDFB80data/endfb80-n/endfb80nfy"

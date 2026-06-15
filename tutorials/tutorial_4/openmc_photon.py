@@ -91,6 +91,6 @@ def make_model(compiled_source, mesh_id, temperature=296):
 
 
 model = make_model(
-    '/home/bill/Projects/FizzyCompiledSource/build/libCompiledSource.so', '1')
+    '/Projects/FizzyCompiledSource/build/libCompiledSource.so', '1')
 
 model.export_to_xml("./openmc_inputs.xml")
