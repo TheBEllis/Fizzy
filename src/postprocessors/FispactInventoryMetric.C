@@ -38,9 +38,33 @@ void FispactInventoryMetric::execute() {
   const FispactInventoryManager &inv_manager =
       getUserObjectByName<FispactInventoryManager>("inv_manager");
 
-  _sum += inv_manager.getElementMetric(_current_elem->id(), inv_index, _metric);
+  double metric_value =
+      inv_manager.getElementMetric(_current_elem->id(), inv_index, _metric);
+
+  if (_metric == inventory_outputs::INVENTORY_DOSE_RATE) {
+
+    double element_volume = _current_elem->volume();
+    double element_mat_density = getFispactProblem()
+                                     .getElementMaterial(_current_elem->id())
+                                     .getDensity();
+
+    double element_mass = element_volume * element_mat_density;
+    metric_value *= element_mass;
+    _total_mass += element_mass;
+  }
+
+  _sum += metric_value;
 }
 
-void FispactInventoryMetric::finalize() { comm().sum(_sum); }
+void FispactInventoryMetric::finalize() {
+
+  if (_metric == inventory_outputs::INVENTORY_DOSE_RATE) {
+    comm().sum(_total_mass);
+
+    // This changes our dose values back to sieverts
+    _sum /= _total_mass;
+  }
+  comm().sum(_sum);
+}
 
 PostprocessorValue FispactInventoryMetric::getValue() const { return _sum; }

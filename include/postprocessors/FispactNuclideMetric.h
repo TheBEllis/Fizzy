@@ -23,4 +23,11 @@ public:
   std::vector<std::string> _nuclides;
 
   nuclide_quantities::NuclideQuantitiesEnum _metric;
+
+  /**
+   * Because sieverts is a specific quantity, if we want the total dose rate of
+   * a set of elements spanning multiple materials, we need to track the
+   * total_mass
+   */
+  double _total_mass;
 };

@@ -575,7 +575,7 @@ void FispactProblem::setFispactSchedule(IFispactInputDataBase &input,
 }
 
 const FispactMaterial &
-FispactProblem::getElementMaterial(dof_id_type &elem_id) {
+FispactProblem::getElementMaterial(const dof_id_type &elem_id) {
 
   libMesh::Elem *elem = _mesh.elemPtr(elem_id);
 
