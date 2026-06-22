@@ -31,7 +31,7 @@ FispactNuclideMetric::FispactNuclideMetric(const InputParameters &params)
       _metric(getParam<MooseEnum>("metric")
                   .getEnum<nuclide_quantities::NuclideQuantitiesEnum>()) {}
 
-void FispactNuclideMetric::initialize() { _sum = 0; }
+void FispactNuclideMetric::initialize() { _sum = 0; _total_mass = 0;}
 
 void FispactNuclideMetric::threadJoin(const UserObject &y) {};
 

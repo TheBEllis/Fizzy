@@ -27,7 +27,10 @@ FispactInventoryMetric::FispactInventoryMetric(const InputParameters &params)
       _metric(getParam<MooseEnum>("metric")
                   .getEnum<inventory_outputs::InventoryOutputsEnum>()) {}
 
-void FispactInventoryMetric::initialize() { _sum = 0; }
+void FispactInventoryMetric::initialize() {
+  _sum = 0;
+  _total_mass = 0;
+}
 
 void FispactInventoryMetric::threadJoin(const UserObject &y) {};
 
@@ -43,12 +46,11 @@ void FispactInventoryMetric::execute() {
 
   if (_metric == inventory_outputs::INVENTORY_DOSE_RATE) {
 
-    double element_volume = _current_elem->volume();
     double element_mat_density = getFispactProblem()
                                      .getElementMaterial(_current_elem->id())
                                      .getDensity();
 
-    double element_mass = element_volume * element_mat_density;
+    double element_mass = _current_elem_volume * element_mat_density;
     metric_value *= element_mass;
     _total_mass += element_mass;
   }
