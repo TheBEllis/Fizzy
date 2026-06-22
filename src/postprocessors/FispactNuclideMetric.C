@@ -44,11 +44,33 @@ void FispactNuclideMetric::execute() {
 
   for (std::string &nuclide : _nuclides) {
 
-    _sum += inv_manager.getNuclideMetric(_current_elem->id(), nuclide,
-                                         inv_index, _metric);
+    double metric_value = inv_manager.getNuclideMetric(
+        _current_elem->id(), nuclide, inv_index, _metric);
+
+    if (_metric == nuclide_quantities::DOSE) {
+      double element_volume = _current_elem->volume();
+      double element_mat_density = getFispactProblem()
+                                       .getElementMaterial(_current_elem->id())
+                                       .getDensity();
+
+      double element_mass = element_volume * element_mat_density;
+      metric_value *= element_mass;
+      _total_mass += element_mass;
+    }
+
+    _sum += metric_value;
   }
 }
 
-void FispactNuclideMetric::finalize() { comm().sum(_sum); }
+void FispactNuclideMetric::finalize() {
+
+  if (_metric == nuclide_quantities::DOSE) {
+    comm().sum(_total_mass);
+
+    // This changes our dose values back to sieverts
+    _sum /= _total_mass;
+  }
+  comm().sum(_sum);
+}
 
 PostprocessorValue FispactNuclideMetric::getValue() const { return _sum; }

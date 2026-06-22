@@ -56,7 +56,7 @@ public:
   bool isFlux(const std::vector<double> &flux) const;
 
   ///
-  const FispactMaterial &getElementMaterial(dof_id_type &elem_id);
+  const FispactMaterial &getElementMaterial(const dof_id_type &elem_id);
 
   void setPhotonBins(const std::vector<double> &photon_bins);
 

@@ -21,4 +21,11 @@ public:
   Real _sum;
 
   inventory_outputs::InventoryOutputsEnum _metric;
+
+  /**
+   * Because sieverts is a specific quantity, if we want the total dose rate of
+   * a set of elements spanning multiple materials, we need to track the
+   * total_mass
+   */
+  double _total_mass;
 };
