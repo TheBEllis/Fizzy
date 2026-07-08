@@ -1,0 +1,47 @@
+name: MOOSE Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Apptainer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apptainer
+
+      - name: Pull Apptainer image
+        run: |
+          apptainer pull library://billellis.07/fizzy/fizzy_cont_202112
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: my_app
+
+      - name: Build application
+        run: |
+          apptainer exec \
+            --bind ${{ github.workspace }}:/workspace \
+            fizzy_cont_202112.sif \
+            bash -c "
+              . /opt/intel/oneapi/setvars.sh &&
+              cd /workspace/Fizzy/unit &&
+              make -j$(nproc)
+            "
+
+      - name: Run tests
+        run: |
+          apptainer exec \
+            --bind ${{ github.workspace }}:/workspace \
+            moose_env.sif \
+            bash -c "
+              cd /workspace/Fizzy/unit &&
+              ./fizzy-unit-opt -j$(nproc)
+            "
