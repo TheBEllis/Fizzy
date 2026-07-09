@@ -1,4 +1,3 @@
-#include "FispactContext.h"
 #include "FispactContextBase.h"
 #include "FispactContextMock.h"
 #include "FispactFactory.h"

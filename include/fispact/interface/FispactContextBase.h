@@ -46,7 +46,36 @@ public:
   virtual double getInhalation() const = 0;
 
   virtual double
-  getQuantity(nuclide_quantities::NuclideQuantitiesEnum quantity) const = 0;
+  getQuantity(nuclide_quantities::NuclideQuantitiesEnum quantity) const {
+
+    switch (quantity) {
+    case (nuclide_quantities::ATOMS):
+      return getAtoms();
+    case (nuclide_quantities::GRAMS):
+      return getGrams();
+    case (nuclide_quantities::ACTIVITY):
+      return getActivity();
+    case (nuclide_quantities::ALPHA_ACTIVITY):
+      return getAlphaActivity();
+    case (nuclide_quantities::BETA_ACTIVITY):
+      return getBetaActivity();
+    case (nuclide_quantities::GAMMA_ACTIVITY):
+      return getGammaActivity();
+    case (nuclide_quantities::TOTAL_HEAT):
+      return getTotalHeat();
+    case (nuclide_quantities::ALPHA_HEAT):
+      return getAlphaHeat();
+    case (nuclide_quantities::BETA_HEAT):
+      return getBetaHeat();
+    case (nuclide_quantities::GAMMA_HEAT):
+      return getGammaHeat();
+    case (nuclide_quantities::DOSE):
+      return getDoseRate();
+    default:
+      throw std::invalid_argument(
+          "Invalid quantity requested from FISPACT nuclide inventory");
+    }
+  }
 
 private:
 };
