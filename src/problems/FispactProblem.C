@@ -886,6 +886,7 @@ void FispactProblem::writePhotonFlux(
 #ifdef H5_HAVE_PARALLEL
   bool parallel = true;
 #else
+  bool parallel = false;
   mooseWarning(
       "Writing photon flux requires HDF5 compiled with MPI. "
       "Simulation continuing, but photon spectra will not be written.");
