@@ -1,13 +1,15 @@
+#ifdef FIZZY_UNIT_TEST
+#include "FispactContextMock.h"
+#else
 #include "FispactContext.h"
-#include "FispactContextBase.h"
+#endif
+
 #include "FispactFactory.h"
-#include <memory>
 
-std::unique_ptr<FispactContextBase> createFispactContext(bool make_mock) {
-  if (make_mock) {
-    return 0;
-  } else {
-
-    return std::make_unique<FispactContext>();
-  }
+std::unique_ptr<FispactContextBase> createFispactContext() {
+#ifdef FIZZY_UNIT_TEST
+  return std::make_unique<FispactContextMock>();
+#else
+  return std::make_unique<FispactContext>();
+#endif
 }

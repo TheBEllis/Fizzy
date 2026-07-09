@@ -975,6 +975,4 @@ void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
 
 const double FispactProblem::avogadroNumber() const { return AVOGADRO; }
 
-void FispactProblem::callFispactFactory() {
-  _fp_ctxt = createFispactContext(getParam<bool>("mock_fispact"));
-}
+void FispactProblem::callFispactFactory() { _fp_ctxt = createFispactContext(); }
