@@ -54,7 +54,7 @@ PUGIXML_LIB_DIR ?= ${PUGIXML_DIR}/build/
 
 HDF5_DIR ?= /usr/lib/x86_64-linux-gnu/hdf5/openmpi/lib/
 
-ADDITIONAL_LIBS += -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5
+ADDITIONAL_LIBS += -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5 -lfmt
 ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES) ${PUGIXML_INCLUDES} -DFIZZY_UNIT_TEST
 # dep apps
 CURRENT_DIR        := $(shell pwd)
