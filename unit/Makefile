@@ -48,28 +48,34 @@ include           $(MOOSE_DIR)/modules/modules.mk
 ADDITIONAL_INCLUDES := -I$(FRAMEWORK_DIR)/contrib/gtest
 ADDITIONAL_LIBS     := $(FRAMEWORK_DIR)/contrib/gtest/libgtest.la
 
-# Extra stuff for FISPACT
-FISPACT_DIR ?= ${MOOSE_DIR}/../FISPACT/ubuntu/20.10
-FISPACT_INCLUDES ?= -I ${FISPACT_DIR}/include/c -I ${FISPACT_DIR}/include/cpp
-FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/
-# FISPACT_LIB ?= 
-
 PUGIXML_DIR ?= $(MOOSE_DIR)/../pugixml/
 PUGIXML_INCLUDES ?= -I $(PUGIXML_DIR)/src/
 PUGIXML_LIB_DIR ?= ${PUGIXML_DIR}/build/
 
 HDF5_DIR ?= /usr/lib/x86_64-linux-gnu/hdf5/openmpi/lib/
 
-ADDITIONAL_LIBS += -L$(FISPACT_LIB_DIR) -ljsonfortran -lmonitor -lfispact -lfispactapi -lfmt -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5
+ADDITIONAL_LIBS += -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5
 ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES) ${PUGIXML_INCLUDES}
 # dep apps
 CURRENT_DIR        := $(shell pwd)
 APPLICATION_DIR    := $(CURRENT_DIR)/..
-APPLICATION_NAME   := fizzy
+APPLICATION_NAME   := Fizzy
+
+FISPACT_STUB_DIR   := $(CURRENT_DIR)/stubs
+FISPACT_STUB_LIB   := $(FISPACT_STUB_DIR)/libfispact_stub.a
+
+$(FISPACT_STUB_LIB): $(FISPACT_STUB_DIR)/fispact_stub.C
+	$(libmesh_CXX) $(libmesh_CXXFLAGS) -c $< -o $(FISPACT_STUB_DIR)/fispact_stub.o
+	ar rcs $@ $(FISPACT_STUB_DIR)/fispact_stub.o
+
+ADDITIONAL_LIBS += $(FISPACT_STUB_LIB)
+
+all: $(FISPACT_STUB_LIB)
+
 include            $(FRAMEWORK_DIR)/app.mk
 
 APPLICATION_DIR    := $(CURRENT_DIR)
-APPLICATION_NAME   := fizzy-unit
+APPLICATION_NAME   := Fizzy-unit
 BUILD_EXEC         := yes
 
 DEP_APPS    ?= $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
