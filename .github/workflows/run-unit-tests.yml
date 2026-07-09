@@ -49,7 +49,7 @@ jobs:
         run: |
           apptainer exec \
             --bind ${{ github.workspace }}:/workspace \
-            moose_env.sif \
+            fizzy_cont_202112_latest.sif \
             bash -c "
               cd /workspace/Fizzy/unit &&
               ./fizzy-unit-opt -j$(nproc)
