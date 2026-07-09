@@ -52,5 +52,5 @@ jobs:
             fizzy_cont_202112_latest.sif \
             bash -c "
               cd /workspace/Fizzy/unit &&
-              ./fizzy-unit-opt -j$(nproc)
+              ./Fizzy-unit-opt -j$(nproc)
             "
