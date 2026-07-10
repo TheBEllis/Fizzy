@@ -2,9 +2,18 @@
 
 ## Prerequisites 
 
-1. A working +MOOSE+ build Currently Fizzy has not been tested using MOOSE's conda environment, only MOOSE builds from source. Being a MOOSE based app, Fizzy shared MOOSE's [minimum requirements](http://mooseframework.inl.gov/sqa/minimum_requirements.html)
-2. Access to FISPACT-II binaries (5.0+) 
- -  FISPACT-II licenses can be purchase from [this](https://www.ukaea.org/service/fispact/) link.
+- A working +MOOSE+ build Currently Fizzy has not been tested using MOOSE's conda environment, only MOOSE builds from source. Being a MOOSE based app, Fizzy shared MOOSE's [minimum requirements](http://mooseframework.inl.gov/sqa/minimum_requirements.html)
+- Access to FISPACT-II binaries (5.0+) 
+
+    - FISPACT-II licenses can be purchase from [this](https://www.ukaea.org/service/fispact/) link.
+
+- PugiXML (1.14+)
+
+ - PugiXML can be easily installed from most package managers.
+
+  ```
+  sudo apt install libpugixml-dev
+  ```
 
 !alert! note title=Recommended 
 > To use all of Fizzy's capabilities, users will also need a valid [Cardinal](https://cardinal.cels.anl.gov/) installation. Instructions on how to install Cardinal can be found [here](https://cardinal.cels.anl.gov/start.html).

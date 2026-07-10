@@ -1,5 +1,4 @@
 # Fizzy
-=======
 
 Fizzy is a MOOSE application wrapping the nuclear inventory, source term and multi-physics code, FISPACT-II.
 
@@ -9,7 +8,7 @@ Fizzy is a MOOSE application wrapping the nuclear inventory, source term and mul
     - Being a MOOSE based application, Fizzy also has the same [minimum requirements](https://mooseframework.inl.gov/sqa/minimum_requirements.html) as MOOSE.
 - PugiXML
     - PugiXML can be installed easily from most package managers
-    `sudo apt install libpugixml`
+    - `sudo apt install libpugixml`
 
 ## Obtaining Fizzy
 
