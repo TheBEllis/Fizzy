@@ -88,8 +88,7 @@ protected:
   void buildObjects() {
 
     InputParameters mesh_params = _factory.getValidParams("FileMesh");
-    mesh_params.set<MeshFileName>("file") =
-        "/home/bill/Projects/Fizzy/geometry/cube.e";
+    mesh_params.set<MeshFileName>("file") = "../geometry/cube.e";
 
     _mesh = _factory.createUnique<FileMesh>("FileMesh", "name1", mesh_params);
     _mesh->setMeshBase(_mesh->buildMeshBaseObject());
