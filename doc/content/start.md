@@ -28,8 +28,6 @@ cd Fizzy
 Fizzy has only been tested on Ubuntu 24.04 (so far). Other Linux distros, MacOS and Windows have not been tested. If users trying to run Fizzy on these platforms
 experience issues with installation and/or running, please report the issue on Fizzy's [github issues](https://github.com/TheBEllis/Fizzy/issues) page.
 
-Installing Fizzy is very similar to installing other MOOSE based applications. 
-
 To install Fizzy, users must specify the directory of their FISPACT-II binaries by setting the environment variable `FISPACT_DIR`. The exact directory will differ depending on the version of FISPACT-II the user has available.
 
 Users must also make sure that the relevent FISPACT-II libraries are present in their `LD_LIBRARY_PATH`.
