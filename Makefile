@@ -88,7 +88,7 @@ export LIBS := $(libmesh_LIBS)
 FISPACT_DIR ?= ${MOOSE_DIR}/../FISPACT/ubuntu/20.10
 FISPACT_DIR ?= ${MOOSE_DIR}
 FISPACT_INCLUDES ?= -I ${FISPACT_DIR}/include/c -I ${FISPACT_DIR}/include/cpp
-FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/
+FISPACT_LIB_DIR ?= ${FISPACT_DIR}/lib/linux
 # FISPACT_LIB ?= 
 
 PUGIXML_DIR ?= $(MOOSE_DIR)/../pugixml/
@@ -97,7 +97,7 @@ PUGIXML_LIB_DIR ?= ${PUGIXML_DIR}/build/
 
 HDF5_DIR ?= /usr/lib/x86_64-linux-gnu/hdf5/openmpi/lib/
 
-ADDITIONAL_LIBS := -L$(FISPACT_LIB_DIR) -ljsonfortran -lmonitor -lfispact -lfispactapi -lfmt -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5
+ADDITIONAL_LIBS := -L$(FISPACT_LIB_DIR) -ljsonfortran -lmonitor -lfispact -lfispactapi -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5
 ADDITIONAL_LIBS += $(CC_LINKER_SLFLAG)$(FISPACT_LIB_DIR)
 
 ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES) ${PUGIXML_INCLUDES}
