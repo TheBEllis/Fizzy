@@ -1,6 +1,5 @@
 #include "HDF5Utils.h"
 #include "MooseError.h"
-#include "fmt/format.h"
 #include "mpi.h"
 #include <string>
 
@@ -54,13 +53,21 @@ std::string object_name(hid_t obj_id) {
 void ensure_exists(hid_t obj_id, const char *name, bool attribute) {
   if (attribute) {
     if (!attribute_exists(obj_id, name)) {
-      mooseError(fmt::format("Attribute \"{}\" does not exist in object {}",
-                             name, object_name(obj_id)));
+
+      std::string error_msg = "Attribute " + std::string(name) +
+                              " does not exist in object " +
+                              object_name(obj_id);
+
+      mooseError(error_msg);
     }
   } else {
     if (!object_exists(obj_id, name)) {
-      mooseError(fmt::format("Object \"{}\" does not exist in object {}", name,
-                             object_name(obj_id)));
+
+      std::string error_msg = "Object " + std::string(name) +
+                              " does not exist in object " +
+                              std::string(object_name(obj_id));
+
+      mooseError(error_msg);
     }
   }
 }
@@ -81,7 +88,8 @@ hid_t file_open(const char *filename, char mode, bool parallel,
     flags = (mode == 'x' ? H5F_ACC_EXCL : H5F_ACC_TRUNC);
     break;
   default:
-    mooseError(fmt::format("Invalid file mode: ", mode));
+    std::string error_msg = "Invalid file mode: " + std::to_string(mode);
+    mooseError(error_msg);
   }
 
   hid_t plist = H5P_DEFAULT;
@@ -102,8 +110,9 @@ hid_t file_open(const char *filename, char mode, bool parallel,
     file_id = H5Fopen(filename, flags, plist);
   }
   if (file_id < 0) {
-    mooseError(fmt::format("Failed to open HDF5 file with mode '{}': {}", mode,
-                           filename));
+    std::string error_msg = "Failed to open HDF5 file with mode " +
+                            std::to_string(mode) + ": " + filename;
+    mooseError(error_msg);
   }
 
 #ifdef H5_HAVE_PARALLEL

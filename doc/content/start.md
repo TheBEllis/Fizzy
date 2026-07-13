@@ -7,13 +7,20 @@
 
     - FISPACT-II licenses can be purchase from [this](https://www.ukaea.org/service/fispact/) link.
 
-- PugiXML (1.14+)
+- [PugiXML](https://pugixml.org/) (1.14+)
 
  - PugiXML can be easily installed from most package managers.
 
   ```
   sudo apt install libpugixml-dev
   ```
+
+- [BOOST] Libraries
+    - This application makes use of `boost::interprocess`. Most users should be able to install BOOST libraries via their package manager. For Debian/Ubuntu users, this would look like:
+
+    ```
+    sudo apt install sudo apt install libboost-all-dev
+    ```
 
 !alert! note title=Recommended 
 > To use all of Fizzy's capabilities, users will also need a valid [Cardinal](https://cardinal.cels.anl.gov/) installation. Instructions on how to install Cardinal can be found [here](https://cardinal.cels.anl.gov/start.html).
