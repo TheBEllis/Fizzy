@@ -57,6 +57,7 @@ void FispactOutputDataGetInventorySortedByKey() {}
 void FispactOutputDataGetInventoryValueByKey() {}
 void FispactOutputDataWrite() {}
 void FispactProcess() {}
+void FispactFilesDataReadKeys() {}
 
 void MonitorCreate() {}
 void MonitorDestroy() {}
