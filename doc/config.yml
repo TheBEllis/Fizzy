@@ -75,5 +75,8 @@ Extensions:
     MooseDocs.extensions.template:
         active: True
 
+globals:
+    type: MooseDocs.extensions.common
+    shortcuts:
 
 

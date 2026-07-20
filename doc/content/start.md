@@ -15,11 +15,18 @@
   sudo apt install libpugixml-dev
   ```
 
-- [BOOST] Libraries
+- [BOOST](https://www.boost.org/doc/user-guide/getting-started.html) Libraries
     - This application makes use of `boost::interprocess`. Most users should be able to install BOOST libraries via their package manager. For Debian/Ubuntu users, this would look like:
 
     ```
     sudo apt install sudo apt install libboost-all-dev
+    ```
+
+- [spdlog](https://github.com/gabime/spdlog) Libraries
+    - FISPACT-II's internal monitoring depends on libspdlog being available on the system
+
+    ```
+    sudo apt install libspdlog-dev
     ```
 
 !alert! note title=Recommended 
