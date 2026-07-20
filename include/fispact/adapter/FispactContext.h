@@ -155,6 +155,8 @@ public:
     _input.setFluxName(flux_name);
   }
 
+  virtual void setExcludeXrays(bool enable) { _input.setExcludeXrays(enable); }
+
   virtual void setDensity(double density) { _input.setDensity(density); }
 
   virtual void setMassTotal(double total_mass) {

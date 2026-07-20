@@ -87,6 +87,8 @@ public:
 
   virtual void setFluxWallLoading(double wall_loading) = 0;
 
+  virtual void setExcludeXrays(bool enable) = 0;
+
   virtual void setFluxName(std::string flux_name) = 0;
 
   virtual void setDensity(double density) = 0;
@@ -159,6 +161,7 @@ public:
   virtual void globalInitialise() = 0;
   virtual void globalFinalise() = 0;
   virtual void process() = 0;
+  // virtual void hasFatal() = 0;
 
   virtual void setNuclearData(
       std::unordered_map<std::string, std::string> nuclear_data_paths) = 0;

@@ -90,6 +90,10 @@ InputParameters FispactProblem::validParams() {
       "Boolean value used to determine whether to wite photon spectra to hdf5 "
       "after Fizzy has finished running.");
 
+  params.addParam<bool>("exclude_xrays", false,
+                        "Boolean value used to determine whether to exclude "
+                        "xrays from output gamma spectrum.");
+
   params.addParam<FileName>(
       "photon_flux_filename", "photon_flux.h5",
       "Filename for the h5 file containing the output photon spectra");
@@ -135,7 +139,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _comm_photon_flux(getParam<bool>("comm_photon_flux")), _solved(false),
       _interprocess_segment_name(generateInterprocessName()),
       _molar_mass_data_filename(getParam<FileName>("molar_mass_data")),
-      _atol(getParam<double>("atol")), _rtol(getParam<double>("rtol")) {
+      _atol(getParam<double>("atol")), _rtol(getParam<double>("rtol")),
+      _exclude_xrays(getParam<bool>("exclude_xrays")) {
 
   /**
    * If write_photon_flux was set to true then check that user input a
@@ -488,6 +493,8 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
   input.setFluxName("neutrons");
 
   input.setSolverTolerance(_rtol, _atol);
+
+  input.setExcludeXrays(_exclude_xrays);
 
   /// Get density from mat density, in g/cm^3!
   double density = material.getDensity();
