@@ -1,4 +1,5 @@
 #include "SubdomainPhotonEmissionSpectraPostprocessor.h"
+#include <algorithm>
 
 registerMooseObject("FizzyApp", SubdomainPhotonEmissionSpectraPostprocessor);
 
@@ -19,6 +20,11 @@ SubdomainPhotonEmissionSpectraPostprocessor::
       _photon_emission_spectra(declareVector("photon_emission_spectra")) {
 
   _photon_emission_spectra.resize(24);
+}
+
+void SubdomainPhotonEmissionSpectraPostprocessor::initialize() {
+  std::fill(_photon_emission_spectra.begin(), _photon_emission_spectra.end(),
+            0.0);
 }
 
 void SubdomainPhotonEmissionSpectraPostprocessor::execute() {
