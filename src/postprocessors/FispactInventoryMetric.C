@@ -27,7 +27,10 @@ FispactInventoryMetric::FispactInventoryMetric(const InputParameters &params)
       _metric(getParam<MooseEnum>("metric")
                   .getEnum<inventory_outputs::InventoryOutputsEnum>()) {}
 
-void FispactInventoryMetric::initialize() { _sum = 0; }
+void FispactInventoryMetric::initialize() {
+  _sum = 0;
+  _total_mass = 0;
+}
 
 void FispactInventoryMetric::threadJoin(const UserObject &y) {};
 
