@@ -95,6 +95,8 @@ public:
 
   virtual void setMassTotal(double total_mass) = 0;
 
+  virtual void setGammaEnergyBounds(const std::vector<double> &bounds) = 0;
+
   virtual void setMass(const std::vector<int> &atomicnumbers,
                        const std::vector<double> &percentages) = 0;
 
@@ -141,9 +143,9 @@ public:
 
   virtual int GetAtomicNumberFromElementName(std::string elementname) = 0;
 
-  virtual std::vector<double> getNeutronEnergyBounds(size_t n_groups) = 0;
-
-  virtual std::vector<double> getPhotonEnergyBounds(size_t n_groups) = 0;
+  // virtual std::vector<double> getNeutronEnergyBounds(size_t n_groups) = 0;
+  //
+  // virtual std::vector<double> getPhotonEnergyBounds(size_t n_groups) = 0;
 
   virtual std::vector<double>
   GroupConvertByEnergy(const std::vector<double> &inbounds,

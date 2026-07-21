@@ -98,9 +98,9 @@ InputParameters FispactProblem::validParams() {
       "photon_flux_filename", "photon_flux.h5",
       "Filename for the h5 file containing the output photon spectra");
 
-  params.addParam<uint64_t>(
-      "num_photon_bins", 24,
-      "The number of bins to sort the output photon flux into");
+  // params.addParam<uint64_t>(
+  //     "num_photon_bins", 24,
+  //     "The number of bins to sort the output photon flux into");
 
   params.addParam<bool>(
       "comm_photon_flux", false,
@@ -122,6 +122,10 @@ InputParameters FispactProblem::validParams() {
   params.addParam<double>("rtol", 2e-3, "Relative FISPACT solver tolerance.");
   params.addParam<double>("atol", 1e4, "Absolute FISPACT solver tolerance.");
 
+  params.addParam<std::vector<double>>(
+      "photon_bins", utils::energy_groups::gamma_groups[24],
+      "Boundaries to use for photon emission spectrum");
+
   params.addParam<bool>(
       "uniform_sampling", false,
       "When using distributed sampling, this forced all elements to be sampled "
@@ -135,7 +139,8 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _photon_flux_filename(getParam<FileName>("photon_flux_filename")),
       _materials_from_xml(getParam<bool>("read_materials_from_xml")),
       _materials_xml_file(getParam<FileName>("materials_xml_file")),
-      _n_photon_bins(getParam<uint64_t>("num_photon_bins")),
+      // _n_photon_bins(getParam<uint64_t>("num_photon_bins")),
+      _photon_bins(getParam<std::vector<double>>("photon_bins")),
       _fp_schedule_uo_name(getParam<UserObjectName>("fispact_schedule_uo")),
       _fp_flux_uo_name(getParam<UserObjectName>("fispact_input_flux_uo")),
       _fp_nuclear_data_uo_name(
@@ -149,6 +154,7 @@ FispactProblem::FispactProblem(const InputParameters &params)
       _atol(getParam<double>("atol")), _rtol(getParam<double>("rtol")),
       _exclude_xrays(getParam<bool>("exclude_xrays")) {
 
+  _n_photon_bins = _photon_bins.size() - 1;
   /**
    * If write_photon_flux was set to true then check that user input a
    * filename, if not use default
@@ -216,7 +222,7 @@ void FispactProblem::initialSetup() {
 
   checkForEnergyGroupConsistency();
 
-  setPhotonBins(_fp_ctxt->getUtils().getPhotonEnergyBounds(_n_photon_bins));
+  // setPhotonBins(_fp_ctxt->getUtils().getPhotonEnergyBounds(_n_photon_bins));
 
   _n_inventories = &(_fp_schedule_uo->getNumInventories());
 
@@ -497,6 +503,8 @@ void FispactProblem::setFispactInputData(const FispactMaterial &material,
                                          const std::vector<double> &flux,
                                          const double &volume,
                                          IFispactInputDataBase &input) const {
+
+  input.setGammaEnergyBounds(_photon_bins);
   input.setFlux(_flux_energy_groups, flux);
   input.setFluxWallLoading(1.0);
   input.setFluxName("neutrons");
@@ -660,9 +668,9 @@ void FispactProblem::convertGammaEvToCount(
   }
 }
 
-void FispactProblem::setPhotonBins(const std::vector<double> &photon_bins) {
-  _photon_bins = photon_bins;
-}
+// void FispactProblem::setPhotonBins(const std::vector<double> &photon_bins) {
+//   _photon_bins = photon_bins;
+// }
 
 double FispactProblem::calculateElementStrength(
     const std::vector<double> element_flux) {
@@ -803,7 +811,7 @@ void FispactProblem::checkForEnergyGroupConsistency() {
 
   if (_fp_flux_input_uo->getNumEnergyGroups() != n_nd_energy_groups) {
     _flux_energy_groups =
-        _fp_ctxt->getUtils().getNeutronEnergyBounds(n_nd_energy_groups);
+        utils::energy_groups::neutron_groups[n_nd_energy_groups];
     _convert_energy_groups = true;
 
     std::string conversion_type = getParam<MooseEnum>("conversion_type");
@@ -966,13 +974,10 @@ void FispactProblem::writePhotonFlux(
 
 void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
                                          const bool parallel) {
-  /// Check _photon_bins are actually set
-  std::vector<double> &photon_bins = getPhotonBins();
-
   /// Set up hsize_t object to hold dataset dimensions
   int ndim = 1;
   hsize_t bin_dataset_dims[ndim];
-  bin_dataset_dims[0] = photon_bins.size();
+  bin_dataset_dims[0] = _photon_bins.size();
 
   std::string dataset_name = "photon_bins";
 
@@ -987,7 +992,7 @@ void FispactProblem::writePhotonFluxBins(const hid_t &file_id,
 
   hdf5_utils::write_dataset_lowlevel(file_id, dataset_name.c_str(), ndim,
                                      bin_dataset_dims, H5T_NATIVE_DOUBLE,
-                                     photon_bins.data(), parallel);
+                                     _photon_bins.data(), parallel);
 }
 
 const double FispactProblem::avogadroNumber() const { return AVOGADRO; }

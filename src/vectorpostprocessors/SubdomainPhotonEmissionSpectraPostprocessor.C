@@ -18,8 +18,7 @@ SubdomainPhotonEmissionSpectraPostprocessor::
     SubdomainPhotonEmissionSpectraPostprocessor(const InputParameters &params)
     : FispactVectorPostprocessor(params), BlockRestrictable(this),
       _photon_emission_spectra(declareVector("photon_emission_spectra")) {
-
-  _photon_emission_spectra.resize(24);
+  _photon_emission_spectra.resize(getFispactProblem().numPhotonBins());
 }
 
 void SubdomainPhotonEmissionSpectraPostprocessor::initialize() {
