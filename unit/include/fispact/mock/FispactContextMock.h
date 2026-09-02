@@ -78,6 +78,8 @@ public:
 
   virtual void setFluxWallLoading(double wall_loading) {}
 
+  virtual void setExcludeXrays(bool enable) {}
+
   virtual void setFluxName(std::string flux_name) {}
 
   virtual void setDensity(double density) {}
