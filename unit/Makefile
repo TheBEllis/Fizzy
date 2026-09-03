@@ -54,12 +54,12 @@ PUGIXML_LIB_DIR ?= ${PUGIXML_DIR}/build/
 
 HDF5_DIR ?= /usr/lib/x86_64-linux-gnu/hdf5/openmpi/lib/
 
-ADDITIONAL_LIBS += -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5 
+ADDITIONAL_LIBS += -L$(PUGIXML_LIB_DIR) -lpugixml -L$(HDF5_DIR) -lhdf5 -lspdlog
 ADDITIONAL_CPPFLAGS += $(FISPACT_INCLUDES) ${PUGIXML_INCLUDES} -DFIZZY_UNIT_TEST
 # dep apps
 CURRENT_DIR        := $(shell pwd)
 APPLICATION_DIR    := $(CURRENT_DIR)/..
-APPLICATION_NAME   := Fizzy
+APPLICATION_NAME   := fizzy
 
 FISPACT_STUB_DIR   := $(CURRENT_DIR)/stubs
 FISPACT_STUB_LIB   := $(FISPACT_STUB_DIR)/libfispact_stub.a
@@ -75,7 +75,7 @@ all: $(FISPACT_STUB_LIB)
 include            $(FRAMEWORK_DIR)/app.mk
 
 APPLICATION_DIR    := $(CURRENT_DIR)
-APPLICATION_NAME   := Fizzy-unit
+APPLICATION_NAME   := fizzy-unit
 BUILD_EXEC         := yes
 
 DEP_APPS    ?= $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
