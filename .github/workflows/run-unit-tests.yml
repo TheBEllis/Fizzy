@@ -34,6 +34,8 @@ jobs:
 
       - name: Build application
         run: |
+          apptainer cache clean --force
+          df -h
           apptainer overlay create --size 1024 overlay.img
           apptainer exec \
             --bind ${{ github.workspace }}:/workspace \
