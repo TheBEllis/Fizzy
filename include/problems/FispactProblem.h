@@ -1,74 +1,163 @@
 #pragma once
+
 #include "ExternalProblem.h"
 
-#include "fispactcompute.hpp"
-#include "fispactelementaldata.hpp"
-#include "fispactgroupconvert.hpp"
-#include "fispactgroupstructures.hpp"
-#include "fispactinputdata.hpp"
-#include "fispactnucleardata.hpp"
-#include "fispactoutputdata.hpp"
-#include "fispactutil.hpp"
-#include <hdf5/openmpi/H5Ipublic.h>
-#include <string>
+#include "FispactContextBase.h"
+#include "FispactFactory.h"
+#include "FispactFluxInput.h"
+#include "FispactMaterial.h"
+#include "FispactNuclearDataPaths.h"
+#include "FispactSchedule.h"
+#include "PhotonSpectra.h"
 
-// Use fp as short for fispact
-namespace fp = fispact;
+// Include for interprocess communication data structure
+#include "HDF5Utils.h"
+#include "PhotonSharingData.h"
+#include <memory>
+#include <string>
+#include <sys/types.h>
+#include <unordered_map>
+
+#ifdef LIBMESH_HAVE_BOOST
+namespace bi = boost::interprocess;
+#endif
 
 class FispactProblem : public ExternalProblem {
-  /// Struct to store Material definitions
-  struct MaterialDefinition {
-    std::string _mat_name;
-    std::vector<std::pair<std::string, double>> _mat_atomic_composition;
-    double _mat_density;
-  };
 
 public:
-  // Constructor for FispactProblem
   FispactProblem(const InputParameters &params);
+
+  ~FispactProblem();
 
   static InputParameters validParams();
 
-  // virtual void initialSetup() override;
+  virtual void initialSetup() override;
+
   virtual void externalSolve() override;
   virtual void syncSolutions(ExternalProblem::Direction direction) override;
   virtual bool converged(unsigned int) override { return true; }
 
-private:
-  static void load_callback(std::string key, std::string path, int i, int t) {
-    std::cout << "\33[2K\r" << key << ": " << path << " [" << i << "/" << t
-              << "]" << std::flush;
+  void timestepSetup() override;
+
+  /**
+   *
+   * Calculates the total strength of one elements photon source term
+   * @param[in] element a ptr to the libmesh element whose strength we are
+   * calculating
+   * @param[in] element_flux the vector representing the energy binned photon
+   * flux for the relevent mesh element
+   * @return the total strength of the photon source term for this element
+   *
+   */
+  double calculateElementStrength(const std::vector<double> element_flux);
+  /**
+   *
+   */
+  bool isFlux(const std::vector<double> &flux) const;
+
+  ///
+  const FispactMaterial &getElementMaterial(const dof_id_type &elem_id);
+
+  void setPhotonBins(const std::vector<double> &photon_bins);
+
+  /**
+   * Converts FISPACT gamma spectra outputs from MeV s^-1 to cm^-3 s^-1
+   * @param[in] photon_energy_spectra_ev Photon energy spectra as output by
+   * FISPACT
+   * @param[out] photon_energy_spectra_per_cc_s Photon energy spectra in
+   * photons/cc-s
+   */
+  void
+  convertGammaEvToCount(const std::vector<double> &photon_energy_spectra_ev,
+                        std::vector<double> &photon_energy_spectra_per_cc_s);
+
+  std::unordered_map<uint64_t, uint64_t> &getLocalElemIndexMap() {
+    return _local_elem_index;
   }
 
-  static void process_callback(std::string process_name, int i, int t) {
-    std::cout << "\33[2K\r [" << i << "/" << t << "] " << process_name
-              << std::flush;
+  PhotonSpectra *getPhotonSpectra() const {
+    return _photon_energy_spectra.get();
   }
 
-  void setNuclearData(std::string nd_base_path);
+  const FispactSchedule &getSchedule() const {
+    if (hasUserObject(_fp_schedule_uo_name)) {
+      return getUserObject<FispactSchedule>(_fp_schedule_uo_name);
+    }
+    mooseError("FispactSchedule UserObject has not been instantiated.");
+  }
 
-  /// Read a neutron flux spectra from a hdf5 file
-  std::vector<double> readNeutronFluxFromHDF5(const std::string &filename);
+  size_t getFispactInventoryIndexFromTime();
 
-  /// Write output photon flux to HDF5
-  void writePhotonFluxToHDF5(const std::string &filename,
-                             fp::OutputData &fispact_output);
+  const double getOutputInventoryTime() const { return _output_inventory_time; }
 
-  void writePhotonFluxBins(hid_t file_id, fp::OutputData &fispact_output);
+  const std::unordered_map<std::string, double> &getMolarMassMap() {
+    return _molar_mass_map;
+  }
 
-  void setFispactInputData(fp::FispactMonitor &monitor, fp::InputData &input,
-                           MaterialDefinition &material,
-                           std::vector<double> &neutron_flux,
-                           const std::vector<double> &bins, double volume);
+  const double avogadroNumber() const;
+
+  const FispactContextBase *getFpContext() const { return _fp_ctxt.get(); }
+
+  /**
+   * Load in molar mass data from HDF5 file set using input params
+   */
+  void loadMolarMasses();
+
+  void callFispactFactory();
+
+  /**
+   * Set the nuclear data for FISPACT
+   * @param[in] nd_base_path The directory containing the various nuclear data
+   * resources required for fispact
+   *
+   */
+  void setNuclearData();
+
+  /**
+   * Method to write calculated photon flux to a HDF5 file, primarily for
+   * debugging purposes.
+   * @param[in] filename the name of the resulting HDF5 file containing the
+   * photon flux
+   *
+   */
+  void writePhotonFlux(const std::string &filename,
+                       const std::vector<double> &inventory_times);
+
+  /**
+   * Method used within @ref writePhotonFlux to write the photon energy bins
+   * used by FISPACT to the same HDF5 file
+   * @param[in] file_id the HDF5 file identifier for the file we are writing to
+   * @param[in] photon_bins a vector of doubles containing the photon energy
+   * bins used
+   * @param[in] parallel indicates whether or not to use the parallel HDF5
+   * driver
+   */
+  void writePhotonFluxBins(const hid_t &file_id, const bool parallel);
+
+  /**
+   *
+   * Method used to set input parameters for a FISPACT activation calculation
+   * @param[in] monitor the FISPACT monitor object required by all FISPACT
+   * methods
+   * @param[in] material the material definition for the FISPACT calculation
+   * @param[in] neutron_flux the energy binned neutron flux
+   * @param[in] bins the energy bin boundaries for neutron flux
+   * @param[in] volume the volume in m^3 for the mesh element this FISPACT
+   * calculation corresponds to
+   * @param[out] input the now correctly setup FISPACT input object
+   */
+  void setFispactInputData(const FispactMaterial &material,
+                           const std::vector<double> &neutron_flux,
+                           const double &volume,
+                           IFispactInputDataBase &input) const;
 
   /// Generate a log file name for the fispact logs
   std::string fispactLogName();
 
-  // Initialise FISPACT monitor object
-  void initFispactMonitor(std::string);
-
-  void readNeutronFluxFromHDF5(std::string filename, std::string tally_dir);
-
+  /**
+   *
+   *
+   */
   void read_material_xml_data();
 
   /**
@@ -77,74 +166,208 @@ private:
    * start as opposed to running into a subdomain lacking a material half way
    * through the solve.
    */
-  void checkMaterialsExist();
+  void checkMaterialsExist() const;
 
   /**
    * Retrieve Fispact radiation schedule from FispactSchedule UserObject
    */
-  void setFispactSchedule(fp::InputData &input);
+  void setFispactSchedule(IFispactInputDataBase &input, const double &volume,
+                          const double &neutron_flux_sum) const;
 
-  void convertGammaEvToCount(fp::InputData &input,
-                             const std::vector<double> &photon_spectra,
-                             const std::vector<double> &photon_flux_bins,
-                             std::vector<double> &photons_per_cc_per_s);
+  /**
+   *
+   */
+  void insertElementStrength(const int inv_index, const libMesh::Elem *element,
+                             const std::vector<double> element_flux);
 
-  void printInventoryByHeat(fp::OutputData &output, int timestep_index,
-                            std::ostream &stream = std::cout);
+  /**
+   *
+   */
+  void calculateLocalDomainStrength();
 
-  void printInventoryByMass(fp::OutputData &output, int timestep_index,
-                            std::ostream &stream);
+  /**
+   *
+   */
+  void getTotalDomainStrength();
 
-  void printInvData(fp::OutputData &output, std::ostream &stream);
+  /**
+   *
+   */
+  void resolveFispactUserObjects();
 
-  double extractHalflifeFromNuc(fp::NuclearData &nuclear_data, int zai);
+  /**
+   * Check if neutron group structure is consistent between the passed in flux
+   * data and the read in nuclear data
+   */
+  void checkForEnergyGroupConsistency();
 
-  bool isFlux(int elem_id);
+  /**
+   *
+   */
+  std::vector<double> &getNeutronBins() {
+    if (_flux_energy_groups.empty()) {
+      mooseError("_flux_energy_groups not set, so could not be gotten");
+    }
+    return _flux_energy_groups;
+  }
 
-  /// FISPACT monitor
-  fp::FispactMonitor _fp_monitor;
+  /**
+   * Return a vector populated with the number of atoms of each isotope in a
+   * given material
+   */
+  std::vector<double> getMaterialAtoms(const FispactMaterial &material);
 
-  /// FISPACT nuclear data
-  fp::NuclearData _fp_nuclear_data;
+  /**
+   * Method to calculate the number of atoms in a given mass of substance
+   */
+  double getNumAtoms(const double &mass, const double &molar_mass,
+                     const double &avogadro) const;
+
+  /**
+   *
+   */
+  std::vector<double> &getPhotonBins() {
+    if (_photon_bins.empty()) {
+      mooseError("_photon_bins not set, so could not be gotten");
+    }
+    return _photon_bins;
+  }
+
+  size_t photonEnergySpectraIdx(size_t inv_idx, dof_id_type elem_id) {
+    return ((inv_idx * (_mesh.nActiveLocalElem() * _n_photon_bins)) +
+            (_local_elem_index[elem_id] * _n_photon_bins));
+  }
+
+  /**
+   *
+   */
+  int calculateMemorySize();
+
+  void convertFluxEnergyGroups(std::vector<double> &flux,
+                               const std::vector<double> &input_energy_groups);
+  /**
+   * Method to generate name of the interprocess memory segment generated by
+   * this MPI rank
+   * @param[out] ipc_name Reference to the string we want to populate
+   */
+  const std::string generateInterprocessName();
+
+protected:
+  /// -- Interprocess bits --
+#ifdef LIBMESH_HAVE_BOOST
+  bi::managed_shared_memory _segment;
+
+  PhotonSharingData *_photon_sharing_instance;
+#endif
+
+  std::unique_ptr<FispactContextBase> _fp_ctxt;
 
   /// FISPACT neutron flux
   std::unordered_map<int, std::vector<double>> _neutron_fluxes;
 
-  // FISPACT Photon fluxes
-  std::unordered_map<int, std::vector<double>> _photon_fluxes;
+  /// FISPACT Photon fluxes
+  /// Indexed by time major, element id minor
+  // std::vector<double> _photon_energy_spectra;
 
-  /// hdf5 filename for neutron flux
-  std::string _neutron_flux_filename;
+  std::unique_ptr<PhotonSpectra> _photon_energy_spectra;
 
-  /// path to neutron flux array in hdf5 file
-  std::string _neutron_flux_hdf5_path;
+  /// Vector to store all local element strengths over all inventory times
+  /// Indexed by time major, element id minor
+  std::vector<double> _element_strengths;
 
   /// hdf5 filename for photon flux
   std::string _photon_flux_filename;
 
-  ///
   bool _materials_from_xml;
-
-  /// Boolean to determine whether a rank is still running FISPACT calculations
-  bool _calculating = true;
 
   /// Filename of xml file to read materials from
   std::string _materials_xml_file;
 
-  /// Mappings from material name to material definitions
-  std::unordered_map<std::string, MaterialDefinition> _mat_definitions;
+  ///
+  // const size_t _input_neutron_bin_structure;
 
-  MaterialDefinition &getElementMaterial(int &elem_id);
+  ///
+  std::vector<double> _flux_energy_groups;
 
-  std::string _neutron_bin_type;
+  ///
+  // std::vector<double> _input_neutron_bins;
 
-  std::vector<double> _neutron_bins;
-
+  ///
   std::vector<double> _photon_bins;
 
-  int _num_neutron_bins;
+  ///
+  // uint64_t _n_input_neutron_bins;
 
-  std::string _schedule_uo_name;
+  ///
+  uint64_t _n_photon_bins;
 
-  void setNeutronBins();
+  /// Number of FISPACT inventories
+  const size_t *_n_inventories;
+
+  /// Number of FISPACT solution inventories(ignoring initial conditions)
+  const size_t *_n_solution_inventories;
+
+  double _output_inventory_time;
+
+  ///
+  UserObjectName _fp_schedule_uo_name;
+
+  ///
+  UserObjectName _fp_flux_uo_name = NULL;
+
+  /// Fispact nuclear data path
+  UserObjectName _fp_nuclear_data_uo_name;
+
+  FispactSchedule *_fp_schedule_uo = nullptr;
+
+  FispactNuclearDataPaths *_fp_nuclear_data_uo;
+
+  FispactFluxInput *_fp_flux_input_uo = nullptr;
+
+  std::vector<FispactMaterial *> _fp_fispact_materials;
+
+  /// Vector to store local domain strength over all inventory times
+  std::vector<double> _local_domain_strength;
+
+  /// Vector to store local domain strength over all inventory times
+  std::vector<double> _total_domain_strength;
+
+  ///
+  bool _write_photon_flux;
+
+  ///
+  bool _comm_photon_flux;
+
+  ///
+  bool _solved;
+
+  ///
+
+  ///
+  bool _convert_energy_groups = false;
+
+  bool _uniform;
+
+  /// name given to the interprocess memory segment generated by this rank
+  const std::string _interprocess_segment_name;
+
+  const std::string &_molar_mass_data_filename;
+
+  /// Map from element ZAI to molar mass (g/mol)
+  std::unordered_map<std::string, double> _molar_mass_map;
+
+  /// Map from global element id to "local element id"
+  std::unordered_map<uint64_t, uint64_t> _local_elem_index;
+
+  /// Absolute tolerance for FISPACT solver
+  double _atol;
+  /// Relative tolerance for FISPACT solver
+  double _rtol;
+
+  // std::unordered_map<size_t, std::vector<double>> _neutron_group_map = {
+  //     {100, fp::groups::G100()},
+  //     {709, fp::groups::G709()},
+  //     {1102, fp::groups::G1102()}};
+  //
+  bool _exclude_xrays;
 };

@@ -1,0 +1,26 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<settings>
+  <run_mode>fixed source</run_mode>
+  <particles>500000</particles>
+  <batches>10</batches>
+  <inactive>0</inactive>
+  <source particle="neutron" strength="1.0" type="independent">
+    <space type="cartesian">
+      <x interpolation="linear-linear" type="tabular">
+        <parameters>-50.0 50.0 0.0 1.0</parameters>
+      </x>
+      <y parameters="-50 50" type="uniform"/>
+      <z parameters="-50 50" type="uniform"/>
+    </space>
+    <energy type="discrete">
+      <parameters>14080000.0 1.0</parameters>
+    </energy>
+  </source>
+  <output>
+    <summary>false</summary>
+    <tallies>false</tallies>
+  </output>
+  <electron_treatment>ttb</electron_treatment>
+  <energy_mode>continuous-energy</energy_mode>
+  <max_tracks>1000</max_tracks>
+</settings>

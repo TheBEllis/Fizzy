@@ -1,0 +1,47 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="nuHiYNkpX3rEI0BLqaq0">
+    <mxGraphModel dx="808" dy="458" grid="0" gridSize="16" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-1" edge="1" parent="1" source="ZBh9AiTcaC5hWOgsyVWg-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#FFFFFF);" target="ZBh9AiTcaC5hWOgsyVWg-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZBh9AiTcaC5hWOgsyVWg-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="for(elem_id in local_elements)" vertex="1">
+          <mxGeometry height="68" width="112" x="32" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-2" edge="1" parent="1" source="ZBh9AiTcaC5hWOgsyVWg-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#FFFFFF);" target="ZBh9AiTcaC5hWOgsyVWg-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZBh9AiTcaC5hWOgsyVWg-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="flux_spectra = read_flux(elem_id)" vertex="1">
+          <mxGeometry height="68" width="112" x="192" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-6" edge="1" parent="1" source="ZBh9AiTcaC5hWOgsyVWg-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#FFFFFF);" target="ZBh9AiTcaC5hWOgsyVWg-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZBh9AiTcaC5hWOgsyVWg-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="input_data = set_input(elem_id, flux, material_props, irradiation_schedule)" vertex="1">
+          <mxGeometry height="68" width="128" x="352" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-5" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.47;entryY=1.005;entryDx=0;entryDy=0;entryPerimeter=0;strokeColor=light-dark(#000000,#FFFFFF);" target="ZBh9AiTcaC5hWOgsyVWg-2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="756" y="208" />
+              <mxPoint x="245" y="208" />
+            </Array>
+            <mxPoint x="755.63" y="148.00000000000003" as="sourcePoint" />
+            <mxPoint x="239.99800000000005" y="148.68000000000004" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-8" edge="1" parent="1" source="ZBh9AiTcaC5hWOgsyVWg-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#FFFFFF);" target="fN4mFnTmdzPNVWRfBsAc-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZBh9AiTcaC5hWOgsyVWg-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="fispact_run(&lt;div&gt;input_data, output_data)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="68" width="112" x="528" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fN4mFnTmdzPNVWRfBsAc-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;fontColor=#ffffff;strokeColor=#006EAF;" value="extract_inventory_data&lt;div&gt;(output_data)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="68" width="136" x="688" y="80" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

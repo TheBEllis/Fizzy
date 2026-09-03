@@ -1,0 +1,3 @@
+[submodule "FizzyCompiledSource"]
+	path = FizzyCompiledSource
+	url = https://github.com/TheBEllis/FizzyCompiledSource
